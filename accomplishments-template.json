@@ -1,0 +1,20 @@
+{
+   "accomplishments": [
+      {
+         "type": "checkbox",
+         "text": "some text 'sport'1"
+      },
+      {
+         "type": "checkbox",
+         "text": "some text 'sport2"
+      },
+      {
+         "type": "checkbox",
+         "text": "some text 'sport'3"
+      },
+      {
+         "type": "text",
+         "text": "some question"
+      }
+   ]
+}
