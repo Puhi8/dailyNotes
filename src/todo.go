@@ -61,11 +61,8 @@ func AppendTodoEntry(todoPath, notePath, date string) error {
 		return fmt.Errorf("read todo file: %w", err)
 	}
 	entry := todoEntry(todoPath, notePath, date)
-	if strings.Contains(string(existing), entry) {
-		return nil
-	}
-
-	content := entry + string(existing)
+	remaining := filterDailyNoteLinks(string(existing))
+	content := entry + remaining
 
 	if err := os.WriteFile(todoPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write todo file: %w", err)
@@ -80,4 +77,23 @@ func todoEntry(todoPath, notePath, date string) string {
 	}
 	relativePath = filepath.ToSlash(relativePath)
 	return fmt.Sprintf("[Daily note %s](%s)\n", date, relativePath)
+}
+
+func filterDailyNoteLinks(content string) string {
+	if content == "" {
+		return ""
+	}
+	lines := strings.Split(content, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(line, "[Daily note ") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	result := strings.Join(kept, "\n")
+	if result != "" && !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
 }

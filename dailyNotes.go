@@ -15,8 +15,8 @@ func main() {
 	vaultFolderPath := os.Args[1]
 	todoPath := os.Args[2]
 	todoProcess := os.Args[3]
-	processesPath := os.Args[4]
-	dailyNotesVaultPath := os.Args[5]
+	dailyNotesVaultPath := os.Args[4]
+	processesPath := os.Args[5]
 	defer src.CleanProcessesTxt(processesPath, os.Args[0])
 
 	if vaultFolderPath == "" || todoPath == "" || dailyNotesVaultPath == "" {
