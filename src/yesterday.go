@@ -19,11 +19,9 @@ func RunYesterdayProcess(yesterdayNotePath, dailyNotesVaultPath string, yesterda
 		return err
 	}
 
-	fmt.Println("deleting:")
-	fmt.Println(yesterdayNotePath)
-	// if err := os.Remove(yesterdayNotePath); err != nil {
-	// 	return fmt.Errorf("delete yesterday note: %w", err)
-	// }
+	if err := os.Remove(yesterdayNotePath); err != nil {
+		return fmt.Errorf("delete yesterday note: %w", err)
+	}
 
 	return nil
 }
