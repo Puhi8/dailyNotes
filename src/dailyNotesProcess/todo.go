@@ -1,4 +1,4 @@
-package src
+package dailyNotesProcess
 
 import (
 	"bufio"
@@ -49,10 +49,6 @@ func processListed(processesPath, processName string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func exeNameFromArgs(args0 string) string {
-	return filepath.Base(args0)
 }
 
 func AppendTodoEntry(todoPath, notePath, date string) error {

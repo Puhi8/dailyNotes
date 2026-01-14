@@ -1,4 +1,4 @@
-package src
+package dailyNotesProcess
 
 import (
 	"encoding/json"

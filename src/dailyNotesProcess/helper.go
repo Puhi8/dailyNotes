@@ -1,4 +1,4 @@
-package src
+package dailyNotesProcess
 
 import (
 	"bufio"
@@ -124,7 +124,7 @@ func round(value float64) float64 {
 }
 
 func CleanProcessesTxt(processesPath, args0 string) error {
-	exeName := strings.ToLower(exeNameFromArgs(args0))
+	exeName := strings.ToLower(filepath.Base(args0))
 	inFile, err := os.Open(processesPath)
 	if err != nil {
 		return err

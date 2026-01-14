@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"time"
-	"dailyNotes/src"
+	"dailyNotes/src/dailyNotesProcess"
 )
 
 func main() {
@@ -17,29 +17,29 @@ func main() {
 	todoProcess := os.Args[3]
 	dailyNotesVaultPath := os.Args[4]
 	processesPath := os.Args[5]
-	defer src.CleanProcessesTxt(processesPath, os.Args[0])
+	defer dailyNotesProcess.CleanProcessesTxt(processesPath, os.Args[0])
 
 	if vaultFolderPath == "" || todoPath == "" || dailyNotesVaultPath == "" {
-		src.ExitWithError(fmt.Errorf("vault folder path, todo.md path, and daily notes vault are required"))
+		dailyNotesProcess.ExitWithError(fmt.Errorf("vault folder path, todo.md path, and daily notes vault are required"))
 	}
 
-	accomplishments, err := src.GetAccomplishmentsConfig(dailyNotesVaultPath)
+	accomplishments, err := dailyNotesProcess.GetAccomplishmentsConfig(dailyNotesVaultPath)
 	if err != nil {
-		src.ExitWithError(err)
+		dailyNotesProcess.ExitWithError(err)
 	}
 	today := time.Now()
 	yesterday := today.AddDate(0, 0, -1)
 
-	yesterdayNotePath := src.NotePathForDate(vaultFolderPath, yesterday)
-	todayNotePath := src.NotePathForDate(vaultFolderPath, today)
+	yesterdayNotePath := dailyNotesProcess.NotePathForDate(vaultFolderPath, yesterday)
+	todayNotePath := dailyNotesProcess.NotePathForDate(vaultFolderPath, today)
 
 	hadError := false
-	if err := src.RunYesterdayProcess(yesterdayNotePath, dailyNotesVaultPath, yesterday, accomplishments); err != nil {
+	if err := dailyNotesProcess.RunYesterdayProcess(yesterdayNotePath, dailyNotesVaultPath, yesterday, accomplishments); err != nil {
 		fmt.Fprintln(os.Stderr, "yesterday:", err)
 		hadError = true
 	}
 
-	if err := src.RunTodayTodoProcess(todayNotePath, todoPath, todoProcess, processesPath, today, accomplishments); err != nil {
+	if err := dailyNotesProcess.RunTodayTodoProcess(todayNotePath, todoPath, todoProcess, processesPath, today, accomplishments); err != nil {
 		fmt.Fprintln(os.Stderr, "today+todo:", err)
 		hadError = true
 	}
