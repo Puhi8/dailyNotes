@@ -4,5 +4,5 @@ Run options: <vault folder path> <todo.md path> <todo process> <daily notes vaul
 
 
 Notes on setup:
-- run chmod +x dailyNotes to give it permissions
-- for manual execution: fixe permission for volume: sudo chown -R user:user ./obsidian_config
+- run `chmod +x dailyNotes` to give it permissions
+- for manual execution: fixe permission for volume: `sudo chown -R user:user ./obsidian_config`
