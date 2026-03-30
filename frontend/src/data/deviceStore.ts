@@ -1,10 +1,10 @@
-import { manageLocalStorage } from "../utils/localProcessing"
+import { isPersistentRuntime, manageLocalStorage } from "../utils/localProcessing"
 
 const DEVICE_DB_NAME = 'dailynotes-device'
 const DEVICE_DB_VERSION = 1
 const DEVICE_STORE_NAME = 'kv'
 
-const hasIndexedDB = () => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined'
+const hasIndexedDB = () => (typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined' && isPersistentRuntime())
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 

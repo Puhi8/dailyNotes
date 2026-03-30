@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom'
 import ErrorState from '../components/ErrorState'
 import { api, type NoteSummary } from '../data/api'
 import { formatDateKey, pad2 } from '../utils/functions'
-
-const monthLabels = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+import { months, weekdays } from '../data/data'
 
 type ParsedDate = {
   year: number
@@ -60,11 +58,7 @@ const buildCalendarMonth = (year: number, month: number, notesByDate: Map<string
       isActive: Boolean(entry),
     })
   }
-  return {
-    key: `${year}-${pad2(month)}`,
-    label: `${monthLabels[month - 1]} ${year}`,
-    days,
-  }
+  return { key: `${year}-${pad2(month)}`, label: `${months.long[month - 1]} ${year}`, days }
 }
 
 export default function Notes() {
@@ -78,18 +72,9 @@ export default function Notes() {
     setIsLoading(true)
     setError(null)
     api.notes.list()
-      .then(result => {
-        if (cancelled) return
-        setNotes(result)
-      })
-      .catch(err => {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Request failed')
-      })
-      .finally(() => {
-        if (cancelled) return
-        setIsLoading(false)
-      })
+      .then(result => { if (!cancelled) setNotes(result) })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Request failed') })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [reloadToken])
 
@@ -106,23 +91,19 @@ export default function Notes() {
       const key = `${parsed.year}-${pad2(parsed.month)}`
       if (!monthMap.has(key)) monthMap.set(key, { year: parsed.year, month: parsed.month })
     }
-
-    const monthList = Array.from(monthMap.values()).sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year
-      return b.month - a.month
-    })
-
-    return monthList.map(({ year, month }) => buildCalendarMonth(year, month, notesByDate))
+    return Array.from(monthMap.values())
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year
+        return b.month - a.month
+      })
+      .map(({ year, month }) => buildCalendarMonth(year, month, notesByDate))
   }, [notes])
 
   if (isLoading) return <div className="state">Loading...</div>
   if (error) return <ErrorState error={error} onReload={() => setReloadToken(token => token + 1)} />
 
   return <div className="page">
-    <header className="pageHeader">
-      <h1>Notes</h1>
-      <p>Pick a day to see the markdown note.</p>
-    </header>
+    <header className="pageHeader"><h1>Notes</h1></header>
     <section className="panelCard panelStack">
       {calendarMonths.length === 0
         ? <div className="panelEmpty">No notes yet.</div>
@@ -132,7 +113,7 @@ export default function Notes() {
               <h2 className="panelTitle">{month.label}</h2>
             </div>
             <div className="calendarWeekdays">
-              {weekdayLabels.map(label => (<span className="calendarWeekday" key={label}>{label}</span>))}
+              {weekdays.short.map(label => (<span className="calendarWeekday" key={label}>{label}</span>))}
             </div>
             <div className="calendarGrid">
               {month.days.map((cell, index) => {

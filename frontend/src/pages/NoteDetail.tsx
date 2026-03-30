@@ -17,22 +17,10 @@ export default function NoteDetail() {
     setIsLoading(true)
     setError(null)
     api.notes.get(date)
-      .then(result => {
-        if (cancelled) return
-        setNote(result)
-      })
-      .catch(err => {
-        if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Request failed'
-        setError(message)
-      })
-      .finally(() => {
-        if (cancelled) return
-        setIsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+      .then(result => { if (!cancelled) setNote(result) })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Request failed') })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
   }, [date, reloadToken])
 
   if (!date) return <div className="state">
@@ -60,9 +48,7 @@ export default function NoteDetail() {
         : <div className="noteEmpty">No note text.</div>
       }
       <div className="noteActions">
-        <Link className="stateButton stateButtonSecondary" to="/notes">
-          Back to calendar
-        </Link>
+        <Link className="stateButton stateButtonSecondary" to="/notes">Back to calendar</Link>
       </div>
     </section>
   </div>

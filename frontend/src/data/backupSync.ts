@@ -108,9 +108,7 @@ const scheduleBackupSync = () => {
   }, delay)
 }
 
-setLocalDataChangeHandler(() => {
-  scheduleBackupSync()
-})
+setLocalDataChangeHandler(() => { scheduleBackupSync() })
 
 export const isBackupAutoSyncEnabled = () => getBackupEnabled()
 

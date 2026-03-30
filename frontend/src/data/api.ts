@@ -5,7 +5,7 @@ import { createAccomplishment, deleteAccomplishment, renameAccomplishment, reord
 import { DEFAULT_API_BASE_URL, apiBaseUrl, login, logout, subscribeAuthChanges, updateRemoteCredentials, authSession } from './remoteAuth'
 export type { SaveDayPayload } from './localWrite'
 export type { BackupSyncStatus } from './backupSync'
-export type { BackupConflictChoice, BackupPullConflict, BackupPullPreview, BackupPullResult } from './backupPull'
+export type { BackupConflictChoice, BackupAccomplishmentChoice, BackupPullConflict, BackupPullPreview, BackupPullResult } from './backupPull'
 
 export type {
   DayData,

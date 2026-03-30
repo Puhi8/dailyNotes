@@ -32,6 +32,7 @@ const normalizeBaseUrl = (value: string) => {
 export const DEFAULT_API_BASE_URL = (() => {
   const fromEnv = normalizeBaseUrl(String(import.meta.env.VITE_API_BASE_URL || ''))
   if (fromEnv) return fromEnv
+  if (!import.meta.env.DEV) return ''
   if (typeof window !== 'undefined') {
     const host = window.location.hostname
     if (host) {

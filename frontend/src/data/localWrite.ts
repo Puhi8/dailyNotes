@@ -10,6 +10,7 @@ import {
   type AccomplishmentDeleteResponse,
   type AccomplishmentItem,
   type DayData,
+  type LocalState,
   type NoteTemplateResponse,
   type IndividualDayResponse,
   dayKey,
@@ -24,11 +25,37 @@ type SaveResponseMap = {
 
 export type SaveDayPayload = Partial<Pick<IndividualDayResponse, 'data' | 'note'>>
 
-const saveDayPayload = async (
-  state: Awaited<ReturnType<typeof loadLocalState>>,
-  mode: IndividualDay,
-  payload: SaveDayPayload,
-) => {
+type LoadedLocalState = Awaited<ReturnType<typeof loadLocalState>>
+
+const withLocalStateWrite = async <T>(work: (state: LoadedLocalState) => Promise<T>): Promise<T> => {
+  return runWithLocalStateWriteLock(async () => {
+    const state = await loadLocalState()
+    return await work(state)
+  })
+}
+
+const getNormalizedAccomplishmentName = (state: LocalState, name: string, excludeId?: number) => {
+  const trimmed = name.trim()
+  if (trimmed === '') throw new Error('Accomplishment name is required.')
+  const duplicate = state.accomplishments.find(item => item.id !== excludeId && item.name.toLowerCase() === trimmed.toLowerCase())
+  if (duplicate) throw new Error('Accomplishment already exists.')
+  return trimmed
+}
+
+const ensureTodayAccomplishmentValue = (state: LocalState, name: string, type: string) => {
+  const todayKey = dayKey.today()
+  const today = state.days[todayKey] ?? { note: '', data: {} }
+  if (name in today.data) today.data[name] = normalizeDayValueForAccomplishmentType(today.data[name], type)
+  else today.data[name] = defaultValueForAccomplishmentType(type)
+  state.days[todayKey] = today
+}
+
+const toAccomplishmentItems = (state: LocalState): AccomplishmentItem[] => {
+  const used = getUsedAccomplishments(state)
+  return state.accomplishments.map(item => ({ ...item, used: used.has(item.name.toLowerCase()) }))
+}
+
+const saveDayPayload = async (state: LoadedLocalState, mode: IndividualDay, payload: SaveDayPayload) => {
   const dateKey = dayKey.get(mode)
   const nextData: DayData = {}
   const typeByName = new Map(
@@ -44,21 +71,13 @@ const saveDayPayload = async (
     }
   }
   const nextNote = String(payload.note ?? '')
-  state.days[dateKey] = {
-    note: nextNote,
-    data: nextData,
-  }
+  state.days[dateKey] = { note: nextNote, data: nextData }
   await persistLocalState(state)
-  return {
-    date: dateKey,
-    data: { ...nextData },
-    note: nextNote,
-  }
+  return { date: dateKey, data: { ...nextData }, note: nextNote }
 }
 
 export async function saveNoteTemplate(template: string): Promise<NoteTemplateResponse> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
+  return withLocalStateWrite(async state => {
     state.noteTemplate = template
     await persistLocalState(state)
     return { template }
@@ -66,18 +85,12 @@ export async function saveNoteTemplate(template: string): Promise<NoteTemplateRe
 }
 
 export async function saveIndividualDay(day: IndividualDay, payload: SaveDayPayload): Promise<IndividualDayResponse> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
-    return await saveDayPayload(state, day, payload)
-  })
+  return withLocalStateWrite(async state => (await saveDayPayload(state, day, payload)))
 }
 
-export async function saveFetch<P extends keyof SaveResponseMap>(
-  path: P,
-  data: unknown,
-): Promise<SaveResponseMap[P]> {
+export async function saveFetch<P extends keyof SaveResponseMap>(path: P, data: unknown): Promise<SaveResponseMap[P]> {
   if (path === '/note-template') {
-    const template = typeof data === 'object' && data && 'template' in data
+    const template = (typeof data === 'object' && data && 'template' in data)
       ? String((data as { template?: unknown }).template ?? '')
       : ''
     return await saveNoteTemplate(template) as SaveResponseMap[P]
@@ -89,47 +102,24 @@ export async function saveFetch<P extends keyof SaveResponseMap>(
 }
 
 export async function createAccomplishment(name: string, type = ''): Promise<AccomplishmentItem> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
-    const trimmed = name.trim()
-    if (trimmed === '') throw new Error('Accomplishment name is required.')
-    const duplicate = state.accomplishments.find(item => item.name.toLowerCase() === trimmed.toLowerCase())
-    if (duplicate) throw new Error('Accomplishment already exists.')
+  return withLocalStateWrite(async state => {
+    const trimmed = getNormalizedAccomplishmentName(state, name)
     const normalizedType = normalizeAccomplishmentType(type)
-
     const id = state.nextAccomplishmentId
     state.nextAccomplishmentId += 1
-    state.accomplishments.push({
-      id,
-      name: trimmed,
-      type: normalizedType,
-      active: true,
-    })
-    const todayKey = dayKey.today()
-    const today = state.days[todayKey] ?? { note: '', data: {} }
-    if (trimmed in today.data) today.data[trimmed] = normalizeDayValueForAccomplishmentType(today.data[trimmed], normalizedType)
-    else today.data[trimmed] = defaultValueForAccomplishmentType(normalizedType)
-    state.days[todayKey] = today
+    const item = { id, name: trimmed, type: normalizedType, active: true }
+    state.accomplishments.push(item)
+    ensureTodayAccomplishmentValue(state, trimmed, normalizedType)
     await persistLocalState(state)
-    return {
-      id,
-      name: trimmed,
-      type: normalizedType,
-      active: true,
-      used: false,
-    }
+    return { ...item, used: false }
   })
 }
 
 export async function renameAccomplishment(id: number, name: string, type = ''): Promise<AccomplishmentItem> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
+  return withLocalStateWrite(async state => {
     const item = state.accomplishments.find(entry => entry.id === id)
     if (!item) throw new Error('Accomplishment not found.')
-    const trimmed = name.trim()
-    if (trimmed === '') throw new Error('Accomplishment name is required.')
-    const duplicate = state.accomplishments.find(entry => entry.id !== id && entry.name.toLowerCase() === trimmed.toLowerCase())
-    if (duplicate) throw new Error('Accomplishment already exists.')
+    const trimmed = getNormalizedAccomplishmentName(state, name, id)
     const normalizedType = normalizeAccomplishmentType(type)
 
     const oldName = item.name
@@ -144,77 +134,36 @@ export async function renameAccomplishment(id: number, name: string, type = ''):
       }
       if (typeChanged && trimmed in day.data) day.data[trimmed] = normalizeDayValueForAccomplishmentType(day.data[trimmed], normalizedType)
     }
-    if (item.active) {
-      const todayKey = dayKey.today()
-      const today = state.days[todayKey] ?? { note: '', data: {} }
-      if (item.name in today.data) {
-        today.data[item.name] = normalizeDayValueForAccomplishmentType(today.data[item.name], item.type)
-        state.days[todayKey] = today
-      }
-      else {
-        today.data[item.name] = defaultValueForAccomplishmentType(item.type)
-        state.days[todayKey] = today
-      }
-    }
-    const used = getUsedAccomplishments(state).has(trimmed.toLowerCase())
+    if (item.active) ensureTodayAccomplishmentValue(state, item.name, item.type)
+    const used = getUsedAccomplishments(state).has(item.name.toLowerCase())
     await persistLocalState(state)
-    return {
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      active: item.active,
-      used,
-    }
+    return { ...item, used }
   })
 }
 
 export async function setAccomplishmentActive(id: number, active: boolean): Promise<AccomplishmentItem> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
+  return withLocalStateWrite(async state => {
     const item = state.accomplishments.find(entry => entry.id === id)
     if (!item) throw new Error('Accomplishment not found.')
     item.active = active
 
-    if (active) {
-      const todayKey = dayKey.today()
-      const today = state.days[todayKey] ?? { note: '', data: {} }
-      if (item.name in today.data) {
-        today.data[item.name] = normalizeDayValueForAccomplishmentType(today.data[item.name], item.type)
-        state.days[todayKey] = today
-      }
-      else {
-        today.data[item.name] = defaultValueForAccomplishmentType(item.type)
-        state.days[todayKey] = today
-      }
-    }
-
+    if (active) ensureTodayAccomplishmentValue(state, item.name, item.type)
     const used = getUsedAccomplishments(state).has(item.name.toLowerCase())
     await persistLocalState(state)
-    return {
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      active: item.active,
-      used,
-    }
+    return { ...item, used }
   })
 }
 
-export async function deleteAccomplishment(id: number): Promise<AccomplishmentDeleteResponse> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
+export async function deleteAccomplishment(id: number, options?: { force?: boolean }): Promise<AccomplishmentDeleteResponse> {
+  return withLocalStateWrite(async state => {
     const index = state.accomplishments.findIndex(entry => entry.id === id)
     if (index < 0) throw new Error('Accomplishment not found.')
     const item = state.accomplishments[index]
     const used = getUsedAccomplishments(state).has(item.name.toLowerCase())
-    if (used) {
+    if (used && !options?.force === true) {
       item.active = false
       await persistLocalState(state)
-      return {
-        id: item.id,
-        deleted: false,
-        active: false,
-      }
+      return { id: item.id, deleted: false, active: false }
     }
 
     state.accomplishments.splice(index, 1)
@@ -222,26 +171,14 @@ export async function deleteAccomplishment(id: number): Promise<AccomplishmentDe
       if (item.name in day.data) delete day.data[item.name]
     }
     await persistLocalState(state)
-    return {
-      id,
-      deleted: true,
-      active: false,
-    }
+    return { id, deleted: true, active: false }
   })
 }
 
 export async function reorderAccomplishments(orderedIds: number[]): Promise<AccomplishmentItem[]> {
-  return runWithLocalStateWriteLock(async () => {
-    const state = await loadLocalState()
+  return withLocalStateWrite(async state => {
     if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-      const used = getUsedAccomplishments(state)
-      return state.accomplishments.map(item => ({
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        active: item.active,
-        used: used.has(item.name.toLowerCase()),
-      }))
+      return toAccomplishmentItems(state)
     }
 
     const byId = new Map(state.accomplishments.map(item => [item.id, item]))
@@ -263,14 +200,6 @@ export async function reorderAccomplishments(orderedIds: number[]): Promise<Acco
 
     state.accomplishments = reordered
     await persistLocalState(state)
-
-    const used = getUsedAccomplishments(state)
-    return state.accomplishments.map(item => ({
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      active: item.active,
-      used: used.has(item.name.toLowerCase()),
-    }))
+    return toAccomplishmentItems(state)
   })
 }

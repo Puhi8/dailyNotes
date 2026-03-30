@@ -308,9 +308,6 @@ func validateAndNormalizeBackupSnapshot(payload *backupSnapshot) error {
 			return fmt.Errorf("too many accomplishments (max %d)", maxBackupAccomplishments)
 		}
 	}
-	sort.Slice(accomplishments, func(i, j int) bool {
-		return strings.ToLower(accomplishments[i].Name) < strings.ToLower(accomplishments[j].Name)
-	})
 	payload.Accomplishments = accomplishments
 
 	dayByDate := make(map[string]backupDay, len(payload.Days))

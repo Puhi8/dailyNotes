@@ -1,18 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type SetStateAction } from 'react'
 import type { DayEntry, ServerData } from '../data/types'
-import { calculateGraphPointLimit, getGraphCompactness } from '../data/graphSettings'
+import graph, { type ChartPoint } from '../data/graph'
 import { LineChart, XAxis, YAxis, Line, ResponsiveContainer, CartesianGrid, Tooltip } from 'recharts'
-import { formatDateKey, pad2 } from '../utils/functions'
-
-type ChartPoint = {
-  date: string
-  value: number
-}
-
-type HeatmapMonthBlock = {
-  label: string
-  weeks: Array<Array<string | null>>
-}
+import { formatDateKey } from '../utils/functions'
+import { dayKey } from '../data/localCore'
+import { months } from '../data/data'
 
 type HeatmapTooltip = {
   x: number
@@ -20,150 +12,58 @@ type HeatmapTooltip = {
   date: string
 }
 
-const parseDateKey = (key: string) => {
-  const parts = key.split('-')
-  if (parts.length !== 3) return null
-  const year = Number.parseInt(parts[0], 10)
-  const month = Number.parseInt(parts[1], 10)
-  const day = Number.parseInt(parts[2], 10)
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
-  const fullYear = 2000 + year
-  const date = new Date(Date.UTC(fullYear, month - 1, day))
-  if (date.getUTCFullYear() !== fullYear || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
-  return date
-}
-
-const formatAxisDate = (key: string) => {
-  const parts = key.split('-')
-  if (parts.length !== 3) return key
-  return `${parts[1]}-${parts[2]}`
-}
-
-const buildDateRange = (startKey: string, endKey: string) => {
-  const start = parseDateKey(startKey)
-  const end = parseDateKey(endKey)
-  if (!start || !end || start.getTime() > end.getTime()) return []
-  const dates: string[] = []
-  for (let cursor = start; cursor.getTime() <= end.getTime(); cursor = new Date(cursor.getTime() + 86400000)) {
-    dates.push(formatDateKey(cursor))
-  }
-  return dates
-}
-
-const compareDateKeys = (a: string, b: string) => {
-  const first = parseDateKey(a)
-  const second = parseDateKey(b)
-  if (!first || !second) return a.localeCompare(b)
-  return first.getTime() - second.getTime()
-}
-
-const buildHeatmapWeeks = (startKey: string, endKey: string) => {
-  const start = parseDateKey(startKey)
-  const end = parseDateKey(endKey)
-  if (!start || !end || start.getTime() > end.getTime()) return []
-  const alignedStart = new Date(start.getTime())
-  while (alignedStart.getUTCDay() !== 1) {
-    alignedStart.setUTCDate(alignedStart.getUTCDate() - 1)
-  }
-  const alignedEnd = new Date(end.getTime())
-  while (alignedEnd.getUTCDay() !== 0) {
-    alignedEnd.setUTCDate(alignedEnd.getUTCDate() + 1)
-  }
-  const weeks: string[][] = []
-  let currentWeek: string[] = []
-  for (let cursor = new Date(alignedStart.getTime()); cursor.getTime() <= alignedEnd.getTime(); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    currentWeek.push(formatDateKey(cursor))
-    if (currentWeek.length === 7) {
-      weeks.push(currentWeek)
-      currentWeek = []
-    }
-  }
-  return weeks
-}
-
-const getMonth = (date: Date, extra = 0, day = 1) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + extra, day))
-
-const buildHeatmapMonthBlocks = (startKey: string, endKey: string) => {
-  const rangeStart = parseDateKey(startKey)
-  const rangeEnd = parseDateKey(endKey)
-  if (!rangeStart || !rangeEnd || rangeStart.getTime() > rangeEnd.getTime()) return []
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const startMonth = getMonth(rangeStart)
-  const endMonth = getMonth(rangeEnd)
-  const blocks: HeatmapMonthBlock[] = []
-  for (let cursor = new Date(startMonth.getTime()); cursor.getTime() <= endMonth.getTime(); cursor.setUTCMonth(cursor.getUTCMonth() + 1)) {
-    const monthStart = getMonth(cursor)
-    const monthEnd = getMonth(cursor, 1, 0)
-    const visibleStart = new Date(Math.max(monthStart.getTime(), rangeStart.getTime()))
-    const visibleEnd = new Date(Math.min(monthEnd.getTime(), rangeEnd.getTime()))
-    if (visibleStart.getTime() > visibleEnd.getTime()) continue
-    const alignedStart = new Date(visibleStart.getTime())
-    while (alignedStart.getUTCDay() !== 1) {
-      alignedStart.setUTCDate(alignedStart.getUTCDate() - 1)
-    }
-    const alignedEnd = new Date(visibleEnd.getTime())
-    while (alignedEnd.getUTCDay() !== 0) {
-      alignedEnd.setUTCDate(alignedEnd.getUTCDate() + 1)
-    }
-    const weeks: Array<Array<string | null>> = []
-    let currentWeek: Array<string | null> = []
-    for (let day = new Date(alignedStart.getTime()); day.getTime() <= alignedEnd.getTime(); day.setUTCDate(day.getUTCDate() + 1)) {
-      const inRange = day.getTime() >= visibleStart.getTime() && day.getTime() <= visibleEnd.getTime()
-      currentWeek.push(inRange ? formatDateKey(day) : null)
-      if (currentWeek.length === 7) {
-        weeks.push(currentWeek)
-        currentWeek = []
-      }
-    }
-    blocks.push({ label: monthNames[cursor.getUTCMonth()], weeks })
-  }
-  return blocks
-}
-
 export default function HomeGraphs({ data }: { data: ServerData }) {
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const [chartView, setChartView] = useState<'line' | 'heatmap'>('line')
-  const compactness = getGraphCompactness()
-  const pointLimit = calculateGraphPointLimit(chartSize.width, compactness)
-  const dataByDate = data.data
-  const rangeDates = buildDateRange(data.graph.start, data.graph.end)
-  const dateList = rangeDates.length > 0 ? rangeDates : Object.keys(dataByDate).sort(compareDateKeys)
+  const lineMode = graph.settings.line.mode.get()
+  const showRawLine = lineMode !== 'avg10_all_days'
+  const showAverageLine = lineMode !== 'raw'
+  const pointLimit = graph.line.pointLimit(chartSize.width, graph.settings.line.compactness.get())
+  const rangeDates = graph.dates.range(data.graph.start, data.graph.end)
+  const dateList = (rangeDates.length > 0 ? rangeDates : Object.keys(data.data)
+    .filter(date => date !== formatDateKey(new Date())).sort(graph.dates.compareKeys))
   const rangeStart = dateList.length > 0 ? dateList[0] : ''
   const rangeEnd = dateList.length > 0 ? dateList[dateList.length - 1] : ''
-  const lineDates = pointLimit > 0 && dateList.length > pointLimit
-    ? dateList.slice(-pointLimit)
-    : dateList
+  const averageAllDaysOnly = lineMode === 'avg10_all_days'
+  const lineDates = pointLimit > 0 && dateList.length > pointLimit ? dateList.slice(-pointLimit) : dateList
+  const shownLineDates = averageAllDaysOnly ? dateList : lineDates
 
   return <section className="chartCard">
     <div className="chartHeader">
-      <div>
+      <div className="chartHeaderRow">
         <h2>Activity</h2>
-        {chartView === 'line' && <p>Last {lineDates.length} days</p>}
+        <div className="chartActions">
+          <button
+            className={chartView === 'line' ? 'active' : undefined}
+            onClick={() => setChartView('line')}
+          >
+            Line
+          </button>
+          <button
+            className={chartView === 'heatmap' ? 'active' : undefined}
+            onClick={() => setChartView('heatmap')}
+          >
+            Heatmap
+          </button>
+        </div>
       </div>
-      <div className="chartActions">
-        <button
-          className={chartView === 'line' ? 'active' : undefined}
-          onClick={() => setChartView('line')}
-        >
-          Line
-        </button>
-        <button
-          className={chartView === 'heatmap' ? 'active' : undefined}
-          onClick={() => setChartView('heatmap')}
-        >
-          Heatmap
-        </button>
-      </div>
+      {chartView === 'line' && averageAllDaysOnly
+        ? <p>10-day average across all {dateList.length} days</p>
+        : <p>Last {shownLineDates.length} days{showAverageLine ? ' (raw + 10-day average)' : ''}</p>
+      }
     </div>
     <div className={`chartArea ${chartView === 'heatmap' ? 'chartAreaCompact' : ''}`}>
       {chartView === 'line'
         ? <HomeGraph
-          dates={lineDates}
-          chartHeight={chartSize.height}
-          dataByDate={dataByDate}
+          dates={shownLineDates}
+          chartSize={chartSize}
+          dataByDate={data.data}
+          showRawLine={showRawLine}
+          showAverageLine={showAverageLine}
+          averageAllDaysOnly={averageAllDaysOnly}
           onResize={setChartSize}
         />
-        : <Heatmap weeks={buildHeatmapWeeks(rangeStart, rangeEnd)} monthBlocks={buildHeatmapMonthBlocks(rangeStart, rangeEnd)} dataByDate={dataByDate} />
+        : <Heatmap range={{ start: rangeStart, end: rangeEnd }} dataByDate={data.data} />
       }
     </div>
   </section>
@@ -171,37 +71,19 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
 
 type HomeGraphProps = {
   dates: string[]
-  chartHeight: number
+  chartSize: { width: number, height: number }
   dataByDate: Record<string, DayEntry>
+  showRawLine: boolean
+  showAverageLine: boolean
+  averageAllDaysOnly: boolean
   onResize: (size: { width: number; height: number }) => void
 }
 
-function HomeGraph({ dates, chartHeight, dataByDate, onResize }: HomeGraphProps) {
+function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine, averageAllDaysOnly, onResize }: HomeGraphProps) {
   const safeMaxValue = 100
-  const gradientHeight = chartHeight || 300
-  const tickCount = safeMaxValue > 10 ? 6 : safeMaxValue + 1
-  const chartData: ChartPoint[] = dates.map(date => ({ date, value: dataByDate[date]?.percent ?? 0 }))
-  const getPointColor = (value: number) => {
-    const ratio = Math.max(0, Math.min(1, value / safeMaxValue))
-    const danger = '#e05d4e'
-    const warn = '#f29f58'
-    const good = '#2fb890'
-    const toRgb = (hex: string) => {
-      const normalized = hex.replace('#', '')
-      const r = parseInt(normalized.slice(0, 2), 16)
-      const g = parseInt(normalized.slice(2, 4), 16)
-      const b = parseInt(normalized.slice(4, 6), 16)
-      return { r, g, b }
-    }
-    const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t)
-    const blend = (from: string, to: string, t: number) => {
-      const a = toRgb(from)
-      const b = toRgb(to)
-      return `rgb(${lerp(a.r, b.r, t)}, ${lerp(a.g, b.g, t)}, ${lerp(a.b, b.b, t)})`
-    }
-    if (ratio <= 0.5) return blend(danger, warn, ratio / 0.5)
-    return blend(warn, good, (ratio - 0.5) / 0.5)
-  }
+  const chartData = graph.line.build(dates, dataByDate)
+  const isMobileChart = chartSize.width > 0 && chartSize.width <= 560
+  const targetXTicks = isMobileChart ? 4 : 7
   return <ResponsiveContainer
     width="100%"
     height="100%"
@@ -217,7 +99,7 @@ function HomeGraph({ dates, chartHeight, dataByDate, onResize }: HomeGraphProps)
           x1="0"
           y1={0}
           x2="0"
-          y2={gradientHeight}
+          y2={chartSize.height || 300}
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0%" stopColor="var(--accent)" />
@@ -228,43 +110,57 @@ function HomeGraph({ dates, chartHeight, dataByDate, onResize }: HomeGraphProps)
       <CartesianGrid horizontal vertical={false} strokeDasharray="2 6" />
       <XAxis
         dataKey="date"
-        tick={{ fill: 'var(--muted)', fontSize: 12 }}
-        tickFormatter={formatAxisDate}
-        interval="preserveStartEnd"
+        tick={{ fill: 'var(--muted)', fontSize: isMobileChart ? 11 : 12 }}
+        tickFormatter={graph.dates.axisLabel}
+        interval={chartData.length > targetXTicks ? Math.ceil(chartData.length / targetXTicks) - 1 : 0}
+        minTickGap={isMobileChart ? 24 : 12}
+        tickMargin={8}
+        padding={isMobileChart ? { left: 6, right: 6 } : { left: 10, right: 10 }}
       />
       <YAxis
         interval={0}
         width={8}
-        tickCount={tickCount}
+        tickCount={safeMaxValue > 10 ? 6 : safeMaxValue + 1}
         domain={[0, safeMaxValue]}
         tick={{ fill: 'var(--muted)', fontSize: 0 }}
       />
       <Tooltip content={<GraphTooltip dataByDate={dataByDate} />} />
-      <Line
-        dataKey="value"
+      {showRawLine && <Line
+        type="linear"
+        dataKey="raw"
         stroke="url(#lineGradient)"
-        strokeWidth={3}
+        strokeWidth={showAverageLine ? 2.4 : 3}
+        strokeOpacity={showAverageLine ? 0.7 : 1}
         dot={({ cx, cy, value }) => {
           if (typeof value !== 'number' || cx == null || cy == null) return null
           return <circle
             cx={cx}
             cy={cy}
             r={4}
-            fill={getPointColor(value)}
+            fill={graph.colors.progress(value)}
             stroke="var(--panel)"
             strokeWidth={1}
           />
         }}
-      ></Line>
+      ></Line>}
+      {showAverageLine && <Line
+        type="monotone"
+        dataKey="smooth10"
+        stroke="var(--warn)"
+        strokeWidth={averageAllDaysOnly ? 3.2 : 3}
+        dot={false}
+      />}
     </LineChart>
   </ResponsiveContainer>
 }
 
-function Heatmap({ weeks, monthBlocks, dataByDate }: { weeks: string[][]; monthBlocks: HeatmapMonthBlock[]; dataByDate: Record<string, DayEntry> }) {
+function Heatmap({ range, dataByDate }: { range: { start: string, end: string }, dataByDate: Record<string, DayEntry> }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [tooltip, setTooltip] = useState<HeatmapTooltip | null>(null)
   const [splitByMonth, setSplitByMonth] = useState(false)
-  const hasData = Boolean(weeks && weeks.length > 0)
+  const weeks = graph.heatmap.weeks(range.start, range.end)
+  const useMultiColor = graph.settings.heatmap.multiColor.get()
+  const monthBlocks = graph.heatmap.monthBlocks(range.start, range.end)
   useEffect(() => {
     const wrapper = wrapperRef.current
     if (!wrapper) return
@@ -285,11 +181,9 @@ function Heatmap({ weeks, monthBlocks, dataByDate }: { weeks: string[][]; monthB
     return () => observer.disconnect()
   }, [weeks.length])
 
-  if (!hasData) return <div className="heatmapEmpty">No heatmap data</div>
+  if (!(weeks && weeks.length > 0)) return <div className="heatmapEmpty">No heatmap data</div>
 
-  const now = new Date()
-  const todayKey = `${pad2(now.getFullYear() % 100)}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const todayKey = dayKey.today()
   const combinedMonthLabels: string[] = []
   let lastMonthLabel = ''
   weeks.forEach(week => {
@@ -304,11 +198,12 @@ function Heatmap({ weeks, monthBlocks, dataByDate }: { weeks: string[][]; monthB
       combinedMonthLabels.push('')
       return
     }
-    const label = monthNames[month - 1] ?? ''
+    const label = months.short[month - 1] ?? ''
     if (label && label !== lastMonthLabel) {
       combinedMonthLabels.push(label)
       lastMonthLabel = label
-    } else combinedMonthLabels.push('')
+    }
+    else combinedMonthLabels.push('')
   })
   const tooltipEntries = tooltip ? Object.entries(dataByDate[tooltip.date]?.data ?? {}) : []
   const orderedBlocks = splitByMonth ? [...monthBlocks].reverse() : monthBlocks
@@ -329,7 +224,7 @@ function Heatmap({ weeks, monthBlocks, dataByDate }: { weeks: string[][]; monthB
                 <div className="heatmapWeek" key={`week-${blockIndex}-${weekIndex}`}>
                   {week.map((date, dayIndex) => {
                     if (!date) return <div key={`empty-${weekIndex}-${dayIndex}`} className="heatmapSpacer" />
-                    return makeHeatmapWeek(dataByDate, date, todayKey, setTooltip)
+                    return makeHeatmapWeek(dataByDate, date, todayKey, setTooltip, useMultiColor)
                   })}
                 </div>
               ))}
@@ -345,7 +240,7 @@ function Heatmap({ weeks, monthBlocks, dataByDate }: { weeks: string[][]; monthB
           <div className="heatmap">
             {weeks.map((week, weekIndex) => (
               <div className="heatmapWeek" key={`week-combined-${weekIndex}`}>
-                {week.map(date => makeHeatmapWeek(dataByDate, date, todayKey, setTooltip))}
+                {week.map(date => makeHeatmapWeek(dataByDate, date, todayKey, setTooltip, useMultiColor))}
               </div>
             ))}
           </div>
@@ -371,7 +266,8 @@ function makeHeatmapWeek(
   dataByDate: Record<string, DayEntry>,
   date: string,
   todayKey: string,
-  setTooltip: Dispatch<SetStateAction<HeatmapTooltip | null>>
+  setTooltip: Dispatch<SetStateAction<HeatmapTooltip | null>>,
+  useMultiColor: boolean,
 ) {
   function heatmapMouseAction(event: MouseEvent, date: string) {
     const container = event.currentTarget.closest('.heatmapWrapper') as HTMLElement | null
@@ -384,10 +280,11 @@ function makeHeatmapWeek(
   }
   const entry = dataByDate[date]
   if (!entry) return <div key={date} className="heatmapSpacer" />
+  const heatColor = (useMultiColor ? graph.colors.progress : graph.heatmap.singleHueColor)(entry.percent)
   return <div
     key={date}
     className={`heatmapCell${date === todayKey ? ' heatmapCellToday' : ''}`}
-    style={{ '--heat': `${entry.percent}%` } as CSSProperties}
+    style={{ '--heat-color': heatColor } as CSSProperties}
     onMouseEnter={event => heatmapMouseAction(event, date)}
   />
 }

@@ -3,7 +3,7 @@ import ErrorState from '../components/ErrorState'
 import { api, type DayData } from '../data/api'
 import { applyNoteTemplate, resolveNoteTemplate } from '../data/noteSettings'
 import type { IndividualDay, StatusOptions } from '../data/types'
-import { toUpperCase } from '../utils/functions'
+import { toUpperCase, useObjectState } from '../utils/functions'
 import { saveIndividualDay } from '../data/localWrite'
 
 const isSameData = (left: DayData, right: DayData) => {
@@ -17,21 +17,29 @@ const isSameData = (left: DayData, right: DayData) => {
   return true
 }
 
+type fetchedData<T> = {
+  main: T
+  original: T
+}
+
+type errorState = {
+  load: string | null
+  save: string | null
+}
+
 const AUTOSAVE_DEBOUNCE_MS = 700
 export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
   const [date, setDate] = useState('')
-  const [data, setData] = useState<DayData>({})
-  const [originalData, setOriginalData] = useState<DayData>({})
-  const [note, setNote] = useState('')
-  const [originalNote, setOriginalNote] = useState('')
+  const [data, setData] = useObjectState<fetchedData<DayData>>({ main: {}, original: {} })
+  const [note, setNote] = useObjectState<fetchedData<string>>({ main: "", original: "" })
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [errors, setErrors] = useObjectState<errorState>({ load: null, save: null })
   const [saveStatus, setSaveStatus] = useState<StatusOptions>('idle')
-  const dataRef = useRef<DayData>(data)
-  const noteRef = useRef(note)
-  const originalDataRef = useRef<DayData>(originalData)
-  const originalNoteRef = useRef(originalNote)
+  const [accomplishmentOrder, setAccomplishmentOrder] = useState<string[]>([])
+  const dataRef = useRef<DayData>(data.main)
+  const noteRef = useRef(note.main)
+  const originalDataRef = useRef<DayData>(data.original)
+  const originalNoteRef = useRef(note.original)
   const saveTimerRef = useRef<number | null>(null)
   const saveInFlightRef = useRef(false)
   const queuedSaveRef = useRef(false)
@@ -39,20 +47,19 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
-    setError(null)
-    Promise.all([api.day.getIndividual(dayType), resolveNoteTemplate()])
-      .then(([result, template]) => {
+    setErrors({ load: null })
+    Promise.all([api.day.getIndividual(dayType), api.accomplishments.list(), resolveNoteTemplate()])
+      .then(([result, accomplishments, template]) => {
         if (cancelled) return
         const displayNote = applyNoteTemplate(result.note || '', String(template)).note
         setDate(result.date)
-        setData(result.data)
-        setOriginalData(result.data)
-        setNote(displayNote)
-        setOriginalNote(displayNote)
+        setData({ main: { ...result.data }, original: { ...result.data } })
+        setNote({ main: displayNote, original: displayNote })
+        setAccomplishmentOrder(accomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean))
       })
       .catch(err => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Request failed')
+        setErrors({ load: err instanceof Error ? err.message : 'Request failed' })
       })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => {
@@ -64,21 +71,31 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
     }
   }, [dayType])
 
-  useEffect(() => { dataRef.current = data }, [data])
-  useEffect(() => { noteRef.current = note }, [note])
-  useEffect(() => { originalDataRef.current = originalData }, [originalData])
-  useEffect(() => { originalNoteRef.current = originalNote }, [originalNote])
+  useEffect(() => { dataRef.current = data.main }, [data.main])
+  useEffect(() => { noteRef.current = note.main }, [note.main])
+  useEffect(() => { originalDataRef.current = data.original }, [data.original])
+  useEffect(() => { originalNoteRef.current = note.original }, [note.original])
 
-  const entries = useMemo(() => Object.entries(data).sort(([a], [b]) => a.localeCompare(b)), [data])
-  const isDirty = !isSameData(originalData, data) || note !== originalNote
+  const entries = useMemo(() => {
+    const orderMap = new Map(accomplishmentOrder.map((name, index) => [name, index]))
+    return Object.entries(data.main).sort(([left], [right]) => {
+      const leftOrder = orderMap.get(left.trim().toLowerCase())
+      const rightOrder = orderMap.get(right.trim().toLowerCase())
+      if (leftOrder != null && rightOrder != null) return leftOrder - rightOrder
+      if (leftOrder != null) return -1
+      if (rightOrder != null) return 1
+      return left.localeCompare(right)
+    })
+  }, [accomplishmentOrder, data.main])
+  const isDirty = !isSameData(data.main, data.original) || note.main !== note.original
 
   const updateValue = (key: string, value: DayData[string]) => {
-    setData(prev => ({ ...prev, [key]: value }))
+    setData(prev => ({ main: { ...prev.main, [key]: value } }))
     setSaveStatus('idle')
   }
 
   const handleNoteChange = (value: string) => {
-    setNote(value)
+    setNote({ main: value })
     setSaveStatus('idle')
   }
 
@@ -90,19 +107,19 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
     if (isSameData(originalDataRef.current, dataRef.current) && noteRef.current === originalNoteRef.current) return
 
     saveInFlightRef.current = true
-    setSaveError(null)
+    setErrors({ save: null })
     setSaveStatus('saving')
     const dataToSave = dataRef.current
     const noteToSave = noteRef.current
     try {
       const result = await saveIndividualDay(dayType, { data: dataToSave, note: noteToSave })
       setDate(result.date)
-      setOriginalData(dataToSave)
-      setOriginalNote(noteToSave)
+      setData({ original: dataToSave })
+      setNote({ original: noteToSave })
       setSaveStatus('saved')
     }
     catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Save failed')
+      setErrors({ save: err instanceof Error ? err.message : 'Save failed' })
       setSaveStatus('idle')
     }
     finally {
@@ -128,16 +145,13 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         saveTimerRef.current = null
       }
     }
-  }, [AUTOSAVE_DEBOUNCE_MS, data, handleSave, isDirty, note])
+  }, [data.main, handleSave, isDirty, note.main])
 
   if (isLoading) return <div className="state">Loading {dayType}...</div>
-  if (error) return <ErrorState error={error} onReload={() => window.location.reload()} />
+  if (errors.load) return <ErrorState error={errors.load} onReload={() => window.location.reload()} />
 
   return <div className="page">
-    <header className="pageHeader">
-      <h1>{toUpperCase(dayType)}</h1>
-      <p>Editing data for {date || dayType}.</p>
-    </header>
+    <header className="pageHeader"><h1>{toUpperCase(dayType)} ({date || dayType})</h1></header>
     <section className="panelCard panelStack">
       <div className="panelSection">
         <h2 className="panelTitle">Checklist</h2>
@@ -173,7 +187,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         <h2 className="panelTitle">Note (.md)</h2>
         <textarea
           className="editorTextarea"
-          value={note}
+          value={note.main}
           placeholder={`Write ${dayType}'s markdown note.`}
           onChange={event => handleNoteChange(event.target.value)}
         />
@@ -182,7 +196,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         {isDirty && saveStatus !== 'saving' && <span className="editorStatus">Unsaved changes.</span>}
         {saveStatus === 'saving' && <span className="editorStatus">Saving...</span>}
         {saveStatus === 'saved' && <span className="editorStatus editorStatusSuccess">Saved.</span>}
-        {saveError && <span className="editorStatus editorStatusError">{saveError}</span>}
+        {errors.save && <span className="editorStatus editorStatusError">{errors.save}</span>}
       </div>
     </section>
   </div>

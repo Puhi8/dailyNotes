@@ -37,9 +37,23 @@ export default function Accomplishments() {
   const [reloadToken, setReloadToken] = useState(0)
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [editingItem, setEditingItem] = useState<AccomplishmentItem | null>(null)
+  const [confirmingForceDelete, setConfirmingForceDelete] = useState(false)
   const [isOrdering, setIsOrdering] = useState(false)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [movedMarker, setMovedMarker] = useState<{ id: number; direction: -1 | 1 } | null>(null)
+
+  useEffect(() => {
+    if (!editingItem) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setEditingItem(null)
+      setConfirmingForceDelete(false)
+      setForm({ editName: '', editType: '' })
+      setErrors({ edit: null })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editingItem, setErrors, setForm])
 
   useEffect(() => {
     let cancelled = false
@@ -101,12 +115,14 @@ export default function Accomplishments() {
 
   const handleOpenEdit = (item: AccomplishmentItem) => {
     setEditingItem(item)
+    setConfirmingForceDelete(false)
     setForm({ editName: item.name, editType: normalizeAccomplishmentType(item.type) })
     setErrors({ edit: null })
   }
 
   const handleCloseEdit = () => {
     setEditingItem(null)
+    setConfirmingForceDelete(false)
     setForm({ editName: '', editType: '' })
   }
 
@@ -124,9 +140,30 @@ export default function Accomplishments() {
       const updated = await api.accomplishments.rename(editingItem.id, trimmed, form.editType)
       setItems(prev => prev.map(item => (item.id === updated.id ? updated : item)))
       setEditingItem(null)
+      setConfirmingForceDelete(false)
       setForm({ editName: '', editType: '' })
     }
     catch (err) { setErrors({ edit: err instanceof Error ? err.message : 'Failed to update accomplishment.', action: null }) }
+    finally { setPendingId(null) }
+  }
+
+  const handleForceDelete = async () => {
+    if (!editingItem) return
+    if (!confirmingForceDelete) {
+      setConfirmingForceDelete(true)
+      setErrors({ edit: null, action: null })
+      return
+    }
+    setPendingId(editingItem.id)
+    setErrors({ edit: null, action: null })
+    try {
+      const result = await api.accomplishments.delete(editingItem.id, { force: true })
+      if (result.deleted) setItems(prev => prev.filter(entry => entry.id !== editingItem.id))
+      setEditingItem(null)
+      setConfirmingForceDelete(false)
+      setForm({ editName: '', editType: '' })
+    }
+    catch (err) { setErrors({ edit: err instanceof Error ? err.message : 'Failed to force delete accomplishment.', action: null }) }
     finally { setPendingId(null) }
   }
 
@@ -165,10 +202,7 @@ export default function Accomplishments() {
   if (errors.general) return <ErrorState error={errors.general} onReload={() => setReloadToken(token => token + 1)} />
 
   return <div className="page">
-    <header className="pageHeader">
-      <h1>Accomplishments</h1>
-      <p>Manage tasks for new days.</p>
-    </header>
+    <header className="pageHeader"><h1>Accomplishments</h1></header>
     <section className="panelCard panelStack">
       <div className="panelSection">
         <form className="lockForm" onSubmit={handleAdd}>
@@ -296,6 +330,25 @@ export default function Accomplishments() {
             <button className="stateButton stateButtonSecondary" type="button" onClick={handleCloseEdit}>Go back</button>
           </div>
         </form>
+        <div className="accomplishmentMeta">Danger zone: force delete removes this accomplishment from all days, even when it was used.</div>
+        <div className="lockActions">
+          <button
+            className="stateButton stateButtonSecondary accomplishmentButton accomplishmentButtonDanger"
+            type="button"
+            onClick={() => { void handleForceDelete() }}
+            disabled={pendingId === editingItem.id}
+          >
+            {confirmingForceDelete ? 'Confirm force delete' : 'Force delete'}
+          </button>
+          {confirmingForceDelete && <button
+            className="stateButton stateButtonSecondary"
+            type="button"
+            onClick={() => setConfirmingForceDelete(false)}
+            disabled={pendingId === editingItem.id}
+          >
+            Cancel
+          </button>}
+        </div>
         {errors.edit && <div className="stateMeta stateMetaError">{errors.edit}</div>}
       </div>
     </div>}

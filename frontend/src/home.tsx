@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { IndividualStatData, ServerData } from './data/types'
 import ErrorState from './components/ErrorState'
 import { api } from './data/api'
 import HomeGraphs from './components/HomeGraphs'
 
+const YESTERDAY_STACK_HEIGHT = 228
+
 export default function Home() {
   const [data, setData] = useState<ServerData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+  const [shouldStackStats, setShouldStackStats] = useState(false)
+  const yesterdayWidgetRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -21,16 +25,32 @@ export default function Home() {
         setData(result)
         setError(null)
       })
-      .catch(err => {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Request failed')
-      })
-      .finally(() => {
-        if (cancelled) return
-        setIsLoading(false)
-      })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Request failed') })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [reloadToken])
+
+  useEffect(() => {
+    const widget = yesterdayWidgetRef.current
+    if (!widget || !data) return
+    const updateStacking = () => {
+      if (!(data.stats[0] && data.stats[1])) {
+        setShouldStackStats(false)
+        return
+      }
+      const height = widget.getBoundingClientRect().height
+      setShouldStackStats(height >= YESTERDAY_STACK_HEIGHT)
+    }
+    updateStacking()
+    window.addEventListener('resize', updateStacking)
+    if (typeof ResizeObserver === 'undefined') return () => window.removeEventListener('resize', updateStacking)
+    const observer = new ResizeObserver(() => updateStacking())
+    observer.observe(widget)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateStacking)
+    }
+  }, [data])
 
   if (isLoading) return <div className="state">Loading...</div>
   if (error) return <ErrorState error={error} onReload={() => setReloadToken(token => token + 1)} />
@@ -43,8 +63,11 @@ export default function Home() {
         <button onClick={() => document.getElementById('widget7')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>7</button>
         <button onClick={() => document.getElementById('widget30')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>30</button>
       </div>
-      <div className="topWidgets">
-        {DisplayYesterday(data.yesterday)}
+      <div className={`topWidgets${shouldStackStats ? ' topWidgetsStacked' : ''}`}>
+        <div className='statsWidget' id='widgetYesterday' ref={yesterdayWidgetRef}>
+          <h3>Yesterday</h3>
+          {data.yesterday.map(item => (<p key={item.text}>{item.text}: {typeof item.value == "boolean" ? item.value ? "Done" : "Felid" : item.value}</p>))}
+        </div>
         {data.stats[0] ? DisplayStats(data.stats[0]) : null}
         {data.stats[1] ? DisplayStats(data.stats[1]) : null}
       </div>
@@ -56,16 +79,9 @@ export default function Home() {
   )
 }
 
-function DisplayStats({ dayCount, stats }: { dayCount: number, stats: IndividualStatData[] }) {
-  return <div className='statsWidget' id={`widget${dayCount}`}>
+const DisplayStats = ({ dayCount, stats }: { dayCount: number, stats: IndividualStatData[] }) => (
+  <div className='statsWidget' id={`widget${dayCount}`}>
     <h3>{dayCount} days</h3>
     {stats.map(statData => (<p key={statData.text}>{statData.text}: {statData.value}</p>))}
   </div>
-}
-
-function DisplayYesterday(data: IndividualStatData[]) {
-  return <div className='statsWidget' id='widgetYesterday'>
-    <h3>Yesterday</h3>
-    {data.map(item => (<p key={item.text}>{item.text}: {typeof item.value == "boolean" ? item.value ? "Done" : "Felid" : item.value}</p>))}
-  </div>
-}
+)

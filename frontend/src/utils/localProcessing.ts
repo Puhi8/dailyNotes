@@ -1,18 +1,31 @@
+import { Capacitor } from '@capacitor/core'
+
 type localStorageSetter = {
   key: string
   value: unknown
 }
 
+const inMemoryStorage = new Map<string, string>()
+export const isPersistentRuntime = () => (typeof window !== 'undefined' && Capacitor.isNativePlatform())
+const shouldPersistLocally = isPersistentRuntime
+
 export const manageLocalStorage = {
   set: (items: localStorageSetter[] | localStorageSetter) => {
     if (typeof window === 'undefined') return
-    if (Array.isArray(items)) for (const item of items) { window.localStorage.setItem(item.key, String(item.value)) }
-    else window.localStorage.setItem(items.key, String(items.value))
+    const list = Array.isArray(items) ? items : [items]
+    for (const item of list) {
+      const value = String(item.value)
+      inMemoryStorage.set(item.key, value)
+      if (shouldPersistLocally()) window.localStorage.setItem(item.key, value)
+    }
   },
   remove: (keys: string | string[]) => {
     if (typeof window === 'undefined') return
-    if (typeof keys !== "string") for (const key of keys) { window.localStorage.removeItem(key) }
-    else window.localStorage.removeItem(keys)
+    const list = typeof keys === "string" ? [keys] : keys
+    for (const key of list) {
+      inMemoryStorage.delete(key)
+      if (shouldPersistLocally()) window.localStorage.removeItem(key)
+    }
   },
   get: getLocalStorageItems
 }
@@ -27,8 +40,12 @@ function getLocalStorageItems(keys: string[], fallbackValue: string | null): (st
 function getLocalStorageItems<T>(keys: string | string[], fallbackValue: T | string | null, parser?: (value: string) => T) {
   if (typeof window === 'undefined') return fallbackValue
   const getValue = (key: string) => {
+    const memoryValue = inMemoryStorage.get(key)
+    if (memoryValue != null) return parser ? parser(memoryValue) : memoryValue
+    if (!shouldPersistLocally()) return fallbackValue
     const raw = window.localStorage.getItem(key)
     if (raw == null) return fallbackValue
+    inMemoryStorage.set(key, raw)
     return parser ? parser(raw) : raw
   }
   return typeof keys === "string" ? getValue(keys) : keys.map(getValue)

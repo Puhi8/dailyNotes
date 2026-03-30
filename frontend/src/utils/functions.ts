@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react'
 
 export function pad2(value: number) { return String(value).padStart(2, '0') }
 
+export const makeDayKey = (date: Date) => `${pad2(date.getFullYear() % 100)}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 export function formatDateKey(arg1: number | Date, month?: number, day?: number): string {
-  if (arg1 instanceof Date) return `${pad2(arg1.getUTCFullYear() % 100)}-${pad2(arg1.getUTCMonth() + 1)}-${pad2(arg1.getUTCDate())}`
+  if (arg1 instanceof Date) return makeDayKey(arg1)
   return `${pad2(arg1 % 100)}-${pad2(month!)}-${pad2(day!)}`
 }
 

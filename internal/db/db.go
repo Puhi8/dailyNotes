@@ -434,7 +434,7 @@ func GetAllAccomplishments(_ int64) ([]AccomplishmentsRow, error) {
 	rows, err := DB.Query(`
 		SELECT accomplishment_id, name, type, active
 		FROM accomplishments
-		ORDER BY name;
+		ORDER BY accomplishment_id;
 	`)
 	if err != nil {
 		return nil, err

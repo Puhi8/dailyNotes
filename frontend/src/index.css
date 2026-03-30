@@ -128,7 +128,15 @@ body {
   gap: 10px;
 }
 
-.panelRow,
+
+.panelRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted);
+}
+
 .statRow {
   display: flex;
   justify-content: space-between;
@@ -139,6 +147,24 @@ body {
 .panelRow>span:last-child,
 .statRow>span:last-child {
   color: var(--text);
+}
+
+.panelRow>span:first-child,
+.statRow>span:first-child {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.panelRowTopAlign {
+  align-items: flex-start;
+}
+
+.panelRowLabelGroup {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  margin-bottom: auto;
+  margin-top: auto;
 }
 
 .accomplishmentAddFields,
@@ -304,6 +330,8 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  justify-self: end;
+  min-width: 0;
 }
 
 .panelRowValueServerWrap {
@@ -323,6 +351,68 @@ body {
 .panelInlineButton {
   padding: 6px 12px;
   font-size: 13px;
+}
+
+.panelInlineSelect {
+  min-width: 190px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.panelRowValueToggle {
+  flex-wrap: nowrap;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex: none;
+}
+
+.toggleSwitchInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSwitchTrack {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.toggleSwitchTrack::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.toggleSwitchInput:checked+.toggleSwitchTrack {
+  border-color: color-mix(in srgb, var(--accent) 74%, var(--panel-edge));
+  background: color-mix(in srgb, var(--accent) 24%, var(--panel));
+}
+
+.toggleSwitchInput:checked+.toggleSwitchTrack::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+.toggleSwitchInput:focus-visible+.toggleSwitchTrack {
+  outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  outline-offset: 2px;
 }
 
 .panelEmpty {
@@ -746,6 +836,26 @@ body {
   gap: 16px;
 }
 
+.topWidgetsStacked {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+}
+
+.topWidgetsStacked #widgetYesterday {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.topWidgetsStacked #widget7 {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.topWidgetsStacked #widget30 {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .homeActions {
   display: flex;
   justify-content: flex-end;
@@ -797,16 +907,22 @@ body {
 }
 
 .chartHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.chartHeaderRow {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
 .chartActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-block: auto;
+  justify-content: flex-end;
 }
 
 .chartActions>button {
@@ -826,7 +942,7 @@ body {
 }
 
 .chartHeader h2 {
-  margin: 0 0 6px;
+  margin: 0;
 }
 
 .chartHeader p {
@@ -912,8 +1028,7 @@ body {
   width: var(--heatmap-cell);
   height: var(--heatmap-cell);
   border-radius: 3px;
-  background-color: var(--panel-edge);
-  background-color: color-mix(in srgb, var(--good) var(--heat, 0%), var(--panel-edge));
+  background-color: var(--heat-color, var(--panel-edge));
   border: 1px solid var(--panel);
 }
 
@@ -1036,6 +1151,38 @@ body {
     flex: 0 0 50%;
     min-width: fit-content;
     scroll-snap-align: center;
+  }
+
+  .topWidgets.topWidgetsStacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .topWidgets.topWidgetsStacked .statsWidget {
+    flex: none;
+    min-width: 0;
+    scroll-snap-align: none;
+  }
+
+  .chartHeaderRow {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .chartActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .chartActions>button {
+    width: auto;
+    text-align: center;
   }
 
   .chartArea {

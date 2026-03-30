@@ -1,5 +1,6 @@
-import { pad2 } from '../utils/functions'
+import { makeDayKey } from '../utils/functions'
 import { getDeviceValue, setDeviceValue } from './deviceStore'
+import { isPersistentRuntime } from '../utils/localProcessing'
 import type { IndividualDay } from './types'
 
 const LOCAL_DATA_KEY = 'dailynotes.localData.v1'
@@ -133,10 +134,7 @@ const cloneLocalState = (state: LocalState): LocalState => ({
   })),
   days: Object.fromEntries(Object.entries(state.days ?? {}).map(([date, day]) => [
     normalizeDayKey(date),
-    {
-      note: String(day?.note ?? ''),
-      data: cloneDayData((day?.data ?? {}) as DayData),
-    },
+    { note: String(day?.note ?? ''), data: cloneDayData((day?.data ?? {}) as DayData) }
   ])),
 })
 
@@ -186,6 +184,11 @@ export const runWithLocalStateWriteLock = async <T>(work: () => Promise<T>): Pro
 export const loadLocalState = async (): Promise<LocalState> => {
   if (typeof window === 'undefined') return defaultLocalState()
   if (localStateCache) return cloneLocalState(localStateCache)
+  if (!isPersistentRuntime()) {
+    const next = defaultLocalState()
+    localStateCache = cloneLocalState(next)
+    return next
+  }
 
   const raw = await getDeviceValue(LOCAL_DATA_KEY)
   if (!raw) {
@@ -195,8 +198,7 @@ export const loadLocalState = async (): Promise<LocalState> => {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<LocalState>
-    const normalized = normalizeLoadedLocalState(parsed)
+    const normalized = normalizeLoadedLocalState(JSON.parse(raw) as Partial<LocalState>)
     localStateCache = cloneLocalState(normalized)
     return normalized
   }
@@ -211,7 +213,7 @@ export const persistLocalState = async (state: LocalState, options?: { scheduleB
   if (typeof window === 'undefined') return
   const next = cloneLocalState(state)
   localStateCache = next
-  await setDeviceValue(LOCAL_DATA_KEY, JSON.stringify(next))
+  if (isPersistentRuntime()) await setDeviceValue(LOCAL_DATA_KEY, JSON.stringify(next))
   if (options?.scheduleBackup !== false) localDataChangeHandler?.()
 }
 
@@ -246,7 +248,7 @@ export const normalizeDayValueForAccomplishmentType = (value: DayData[string], k
 }
 
 export const dayKey = {
-  make: (date: Date) => `${pad2(date.getFullYear() % 100)}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
+  make: makeDayKey,
   today: () => dayKey.make(new Date()),
   yesterday: () => {
     const date = new Date()
@@ -303,7 +305,4 @@ const buildBackupSnapshot = (state: LocalState): BackupSnapshot => {
   }
 }
 
-export const createBackupSnapshot = async (): Promise<BackupSnapshot> => {
-  const state = await loadLocalState()
-  return buildBackupSnapshot(state)
-}
+export const createBackupSnapshot = async (): Promise<BackupSnapshot> => buildBackupSnapshot(await loadLocalState())

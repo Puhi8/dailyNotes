@@ -16,6 +16,7 @@ import { fetchRemoteWithAuth } from './remoteAuth'
 const NOTE_TEMPLATE_KEY = 'dailynotes.noteTemplate'
 
 export type BackupConflictChoice = 'local' | 'remote'
+export type BackupAccomplishmentChoice = 'local' | 'remote' | 'merge'
 
 export type BackupSnapshotDay = {
   date: string
@@ -35,6 +36,11 @@ export type BackupPullPreview = {
   localOnlyDays: number
   remoteOnlyDays: number
   identicalDays: number
+  localOnlyAccomplishments: number
+  remoteOnlyAccomplishments: number
+  differingAccomplishments: number
+  identicalAccomplishments: number
+  accomplishmentOrderDiffers: boolean
 }
 
 export type BackupPullResult = {
@@ -75,8 +81,8 @@ const normalizeSnapshot = (raw: unknown): BackupSnapshot => {
     if (accomplishmentByName.has(key)) continue
     accomplishmentByName.set(key, {
       name,
-      type: normalizeAccomplishmentType(String(item.type ?? '')),
       active: item.active !== false,
+      type: normalizeAccomplishmentType(String(item.type ?? '')),
     })
   }
 
@@ -108,16 +114,10 @@ const createSnapshotFromLocalState = (state: LocalState): BackupSnapshot => ({
   noteTemplate: state.noteTemplate ?? '',
   accomplishments: state.accomplishments.map(item => ({
     name: item.name,
-    type: normalizeAccomplishmentType(item.type),
     active: item.active,
+    type: normalizeAccomplishmentType(item.type),
   })),
-  days: Object.keys(state.days)
-    .sort(compareDayKeys)
-    .map(date => ({
-      date,
-      note: state.days[date]?.note ?? '',
-      data: cloneDayData(state.days[date]?.data ?? {}),
-    })),
+  days: Object.keys(state.days).sort(compareDayKeys).map(date => ({ date, note: state.days[date]?.note ?? '', data: cloneDayData(state.days[date]?.data ?? {}) })),
 })
 
 const dayEquals = (left: BackupSnapshotDay, right: BackupSnapshotDay) => {
@@ -138,35 +138,84 @@ const buildPreview = (localSnapshot: BackupSnapshot, remoteSnapshot: BackupSnaps
   const allDates = new Set<string>([...localDays.keys(), ...remoteDays.keys()])
 
   const conflicts: BackupPullConflict[] = []
-  let localOnlyDays = 0
-  let remoteOnlyDays = 0
-  let identicalDays = 0
-
+  const days = { localOnlyDays: 0, remoteOnlyDays: 0, identicalDays: 0 }
   for (const date of [...allDates].sort(compareDayKeys)) {
     const localDay = localDays.get(date)
     const remoteDay = remoteDays.get(date)
     if (localDay && remoteDay) {
-      if (dayEquals(localDay, remoteDay)) identicalDays += 1
+      if (dayEquals(localDay, remoteDay)) days.identicalDays += 1
       else conflicts.push({ date, local: localDay, remote: remoteDay })
       continue
     }
-    if (localDay) localOnlyDays += 1
-    else remoteOnlyDays += 1
+    if (localDay) days.localOnlyDays += 1
+    else days.remoteOnlyDays += 1
   }
 
-  return {
-    remoteSnapshot,
-    conflicts,
-    localOnlyDays,
-    remoteOnlyDays,
-    identicalDays,
+  const localAccomplishments = localSnapshot.accomplishments
+  const remoteAccomplishments = remoteSnapshot.accomplishments
+  const localByName = new Map(localAccomplishments.map(item => [item.name.trim().toLowerCase(), item]))
+  const remoteByName = new Map(remoteAccomplishments.map(item => [item.name.trim().toLowerCase(), item]))
+  const allNames = new Set<string>([...localByName.keys(), ...remoteByName.keys()])
+  const accomplishments = { localOnlyAccomplishments: 0, remoteOnlyAccomplishments: 0, differingAccomplishments: 0, identicalAccomplishments: 0 }
+  for (const name of allNames) {
+    const local = localByName.get(name)
+    const remote = remoteByName.get(name)
+    if (local && remote) {
+      if (
+        normalizeAccomplishmentType(local.type) === normalizeAccomplishmentType(remote.type) &&
+        (local.active !== false) === (remote.active !== false)
+      ) accomplishments.identicalAccomplishments += 1
+      else accomplishments.differingAccomplishments += 1
+      continue
+    }
+    if (local) accomplishments.localOnlyAccomplishments += 1
+    else accomplishments.remoteOnlyAccomplishments += 1
   }
+
+  const localOrder = localAccomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean)
+  const remoteOrder = remoteAccomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean)
+  const accomplishmentOrderDiffers = (localOrder.length !== remoteOrder.length || localOrder.some((name, index) => remoteOrder[index] !== name))
+
+  return { remoteSnapshot, conflicts, ...days, ...accomplishments, accomplishmentOrderDiffers }
+}
+
+const mergeAccomplishments = (
+  localSnapshot: BackupSnapshot,
+  remoteSnapshot: BackupSnapshot,
+  mergedDays: BackupSnapshot['days'],
+  accomplishmentChoice: BackupAccomplishmentChoice,
+) => {
+  const byName = new Map<string, { name: string; type: string; active: boolean }>()
+  const saveAccomplishment = (rawName: string, rawType: string, active: boolean) => {
+    const name = rawName.trim()
+    if (!name) return
+    const key = name.toLowerCase()
+    if (byName.has(key)) return
+    byName.set(key, { name, type: normalizeAccomplishmentType(rawType), active })
+  }
+
+  if (accomplishmentChoice === 'local') for (const item of localSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
+  else if (accomplishmentChoice === 'remote') for (const item of remoteSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
+  else {
+    for (const item of remoteSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
+    for (const item of localSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
+  }
+
+  for (const day of mergedDays) {
+    for (const [task, value] of Object.entries(day.data ?? {})) {
+      const inferredType = typeof value === 'string' ? 'text' : ''
+      saveAccomplishment(task, inferredType, true)
+    }
+  }
+
+  return [...byName.values()]
 }
 
 const mergeSnapshots = (
   localSnapshot: BackupSnapshot,
   remoteSnapshot: BackupSnapshot,
   choices: Record<string, BackupConflictChoice>,
+  accomplishmentChoice: BackupAccomplishmentChoice,
 ): BackupSnapshot => {
   const localDays = new Map(localSnapshot.days.map(day => [day.date, day]))
   const remoteDays = new Map(remoteSnapshot.days.map(day => [day.date, day]))
@@ -194,29 +243,11 @@ const mergeSnapshots = (
     if (localDay) mergedDays.push({ date, note: localDay.note, data: cloneDayData(localDay.data) })
   }
 
-  const byName = new Map<string, { name: string; type: string; active: boolean }>()
-  const saveAccomplishment = (rawName: string, rawType: string, active: boolean) => {
-    const name = rawName.trim()
-    if (!name) return
-    const key = name.toLowerCase()
-    if (byName.has(key)) return
-    byName.set(key, { name, type: normalizeAccomplishmentType(rawType), active })
-  }
-
-  for (const item of remoteSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
-  for (const item of localSnapshot.accomplishments) saveAccomplishment(item.name, item.type, item.active)
-  for (const day of mergedDays) {
-    for (const [task, value] of Object.entries(day.data ?? {})) {
-      const inferredType = typeof value === 'string' ? 'text' : ''
-      saveAccomplishment(task, inferredType, true)
-    }
-  }
-
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
     noteTemplate: remoteSnapshot.noteTemplate ?? '',
-    accomplishments: [...byName.values()],
+    accomplishments: mergeAccomplishments(localSnapshot, remoteSnapshot, mergedDays, accomplishmentChoice),
     days: mergedDays,
   }
 }
@@ -229,11 +260,7 @@ const snapshotToLocalState = (snapshot: BackupSnapshot): LocalState => {
     active: item.active !== false,
   }))
   const days = Object.fromEntries(snapshot.days.map(day => [
-    normalizeDayKey(day.date),
-    {
-      note: String(day.note ?? ''),
-      data: cloneDayData(day.data),
-    },
+    normalizeDayKey(day.date), { note: String(day.note ?? ''), data: cloneDayData(day.data) },
   ]))
   return {
     version: 1,
@@ -251,20 +278,19 @@ export const previewBackupPull = async (): Promise<BackupPullPreview> => {
   return buildPreview(localSnapshot, remoteSnapshot)
 }
 
-export const applyBackupPull = async (remoteSnapshotRaw: BackupSnapshot, choices: Record<string, BackupConflictChoice>): Promise<BackupPullResult> => {
+export const applyBackupPull = async (
+  remoteSnapshotRaw: BackupSnapshot,
+  choices: Record<string, BackupConflictChoice>,
+  accomplishmentChoice: BackupAccomplishmentChoice = 'merge',
+): Promise<BackupPullResult> => {
   const remoteSnapshot = normalizeSnapshot(remoteSnapshotRaw)
   return runWithLocalStateWriteLock(async () => {
     const localSnapshot = createSnapshotFromLocalState(await loadLocalState())
     const preview = buildPreview(localSnapshot, remoteSnapshot)
-    const mergedSnapshot = mergeSnapshots(localSnapshot, remoteSnapshot, choices)
+    const mergedSnapshot = mergeSnapshots(localSnapshot, remoteSnapshot, choices, accomplishmentChoice)
     const nextState = snapshotToLocalState(mergedSnapshot)
     await persistLocalState(nextState)
     manageLocalStorage.set({ key: NOTE_TEMPLATE_KEY, value: nextState.noteTemplate })
-    return {
-      noteTemplate: nextState.noteTemplate,
-      dayCount: Object.keys(nextState.days).length,
-      conflictCount: preview.conflicts.length,
-    }
+    return { noteTemplate: nextState.noteTemplate, dayCount: Object.keys(nextState.days).length, conflictCount: preview.conflicts.length }
   })
 }
-
