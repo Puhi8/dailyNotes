@@ -32,6 +32,8 @@ ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-${VERSION}.apk}"
 ANDROID_LATEST_ASSET_NAME="${ANDROID_LATEST_ASSET_NAME:-${APP}-android.apk}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
+GHCR_USERNAME="${GHCR_USERNAME:-}"
+GHCR_TOKEN="${GHCR_TOKEN:-${CR_PAT:-${GITHUB_TOKEN:-}}}"
 
 TARGETS=(
   "linux amd64"
@@ -53,10 +55,92 @@ require_cmd() {
 }
 
 check_github_auth() {
-  gh auth status >/dev/null 2>&1 || {
-    echo "GitHub CLI is not authenticated. Run: gh auth login"
+  local status_output
+
+  if status_output="$(gh auth status 2>&1)"; then
+    return 0
+  fi
+
+  printf '%s\n' "$status_output"
+  echo "GitHub CLI must be authenticated before releasing."
+  echo "Run: gh auth login -h github.com"
+  exit 1
+}
+
+gh_auth_account() {
+  gh auth status 2>&1 | awk '
+    match($0, /account [^[:space:]]+/) {
+      print substr($0, RSTART + 8, RLENGTH - 8)
+      exit
+    }
+  '
+}
+
+gh_auth_has_scope() {
+  local scope="$1"
+
+  gh auth status 2>&1 | awk -v scope="$scope" '
+    /Token scopes:/ {
+      if (index($0, scope) > 0) {
+        found = 1
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  '
+}
+
+docker_image_registry() {
+  printf '%s\n' "${DOCKER_IMAGE%%/*}"
+}
+
+docker_image_owner() {
+  local image_path
+
+  image_path="${DOCKER_IMAGE#*/}"
+  if [[ "$image_path" == "$DOCKER_IMAGE" || "$image_path" != */* ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${image_path%%/*}"
+}
+
+ensure_docker_registry_auth() {
+  local registry image_owner username token
+
+  registry="$(docker_image_registry)"
+  [[ "$registry" == "ghcr.io" ]] || return 0
+
+  image_owner="$(docker_image_owner || true)"
+  username="${GHCR_USERNAME:-${GITHUB_ACTOR:-}}"
+  token="$GHCR_TOKEN"
+
+  if [[ -z "$token" ]]; then
+    check_github_auth
+    if ! gh_auth_has_scope "write:packages"; then
+      echo "GitHub CLI token is missing the write:packages scope required for GHCR pushes."
+      echo "Run: gh auth refresh -h github.com -s write:packages"
+      echo "Or set GHCR_TOKEN and GHCR_USERNAME before running the release."
+      exit 1
+    fi
+
+    token="$(gh auth token 2>/dev/null)" || {
+      echo "Unable to read a GitHub token for GHCR login."
+      exit 1
+    }
+    username="${username:-$(gh_auth_account)}"
+  fi
+
+  username="${username:-$image_owner}"
+  [[ -n "$username" ]] || {
+    echo "Unable to determine the GHCR username for $DOCKER_IMAGE."
+    echo "Set GHCR_USERNAME or GITHUB_ACTOR before running the release."
     exit 1
   }
+
+  echo "Logging into $registry as $username..."
+  printf '%s\n' "$token" | docker login "$registry" -u "$username" --password-stdin >/dev/null
 }
 
 check_frontend_deps() {
@@ -446,6 +530,7 @@ main() {
 
   check_git
   check_github_auth
+  ensure_docker_registry_auth
   check_frontend_deps
   check_tag
 
