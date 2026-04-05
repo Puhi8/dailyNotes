@@ -6,6 +6,7 @@ accomplishments.json
 dailyNotes
 package-lock.json
 android/
+testOnServer.sh
 
 logs
 *.log
