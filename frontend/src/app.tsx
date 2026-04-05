@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
 import StartupGate from './components/StartupGate'
@@ -12,15 +13,29 @@ import Settings from './pages/Settings'
 import SingleDay from './pages/SingleDay'
 import { useAndroidBackButton } from './utils/hardwareBack'
 
+const routerBasename = (() => {
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  return baseUrl === '/' ? undefined : baseUrl.replace(/\/$/, '')
+})()
+
+const shouldUseHashRouter = (!Capacitor.isNativePlatform() && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
+
 export default function App() {
   return <AuthProvider>
     <SecurityProvider>
-      <BrowserRouter>
-        <AndroidBackButtonBridge />
-        <StartupGate>
-          <AppShell />
-        </StartupGate>
-      </BrowserRouter>
+      {shouldUseHashRouter
+        ? <HashRouter>
+          <AndroidBackButtonBridge />
+          <StartupGate>
+            <AppShell />
+          </StartupGate>
+        </HashRouter>
+        : <BrowserRouter basename={routerBasename}>
+          <AndroidBackButtonBridge />
+          <StartupGate>
+            <AppShell />
+          </StartupGate>
+        </BrowserRouter>}
     </SecurityProvider>
   </AuthProvider>
 }

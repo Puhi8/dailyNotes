@@ -95,6 +95,10 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     const normalized = pin.trim()
     writeStoredPin(normalized)
     setDevicePinState(normalized)
+    if (normalized) {
+      setIsUnlocked(true)
+      setIsHomeUnlocked(true)
+    }
   }, [])
 
   const setBiometricEnabled = useCallback((enabled: boolean) => {
@@ -247,7 +251,7 @@ export function RequireReauth({
     pinInputRef.current?.focus()
   }, [biometricSettled, hasPin, isCompleted])
 
-  if (isCompleted) return <>{children}</>
+  if (!hasPin || isCompleted) return <>{children}</>
 
   return <div className="state state-locked">
     <div className="stateCard">

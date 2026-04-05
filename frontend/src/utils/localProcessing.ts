@@ -1,12 +1,10 @@
-import { Capacitor } from '@capacitor/core'
-
 type localStorageSetter = {
   key: string
   value: unknown
 }
 
 const inMemoryStorage = new Map<string, string>()
-export const isPersistentRuntime = () => (typeof window !== 'undefined' && Capacitor.isNativePlatform())
+export const isPersistentRuntime = () => (typeof window !== 'undefined')
 
 export const manageLocalStorage = {
   set: (items: localStorageSetter[] | localStorageSetter) => {

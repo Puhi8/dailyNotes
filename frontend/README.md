@@ -4,11 +4,22 @@
 - Install dependencies: `npm install`
 - Start the dev server: `npm run dev`
 
+## GitHub Pages
+- Static hosting works when the production web build uses hash routing.
+- Easiest build command:
+  `npm run build:github-pages`
+- Build for a project site with:
+  `VITE_PUBLIC_BASE_PATH=/your-repo-name/ npm run build:github-pages`
+- Build for a user/org site root with:
+  `VITE_PUBLIC_BASE_PATH=/ npm run build:github-pages`
+- If you deploy from GitHub Actions, `VITE_PUBLIC_BASE_PATH` can usually be omitted because the Vite config derives the project-site base path from `GITHUB_REPOSITORY`.
+- In GitHub Pages mode, routes look like `/#/settings`, which avoids server-side 404s on refresh/direct links.
+
 ## API base URL
 - Set `VITE_API_BASE_URL` (defaults to `http://localhost:5789`)
 
 ## Local data (offline-first)
-- Daily data is stored on-device in IndexedDB (`dailynotes-device` DB, `kv` store).
+- Daily data is stored in IndexedDB (`dailynotes-device` DB, `kv` store) on supported platforms, including browser builds.
 - Existing `localStorage` data is migrated automatically on first load.
 - Remote API is optional and used only for backup/auth/sync features.
 

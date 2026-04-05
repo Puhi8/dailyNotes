@@ -85,6 +85,8 @@ To enable TLS, set both TLS variables.
 ### Frontend environment variables
 
 - `VITE_API_BASE_URL`: backend base URL (defaults to `http://localhost:5789`).
+- `VITE_ROUTER_MODE`: set to `hash` for static hosts like GitHub Pages.
+- `VITE_PUBLIC_BASE_PATH`: optional base path for subpath deploys such as `/repo-name/`.
 
 ## Build
 
@@ -99,4 +101,11 @@ Frontend production bundle:
 ```bash
 cd frontend
 npm run build
+```
+
+GitHub Pages-friendly frontend build:
+
+```bash
+cd frontend
+VITE_ROUTER_MODE=hash npm run build
 ```
