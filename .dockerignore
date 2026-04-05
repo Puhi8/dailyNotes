@@ -1,0 +1,15 @@
+.git
+.gitignore
+.vscode
+
+frontend/node_modules
+frontend/dist
+frontend/android/build
+
+backup
+test
+dist
+node_modules
+
+dailyNotes
+*.log

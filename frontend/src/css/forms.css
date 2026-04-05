@@ -1,0 +1,295 @@
+.stateButton {
+  border: none;
+  background: var(--accent);
+  color: var(--panel);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  justify-self: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stateButtonSecondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+}
+
+.stateMetaError {
+  color: var(--danger);
+}
+
+.lockForm {
+  display: grid;
+  gap: 10px;
+}
+
+.lockInput {
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.lockActions {
+  display: grid;
+  gap: 8px;
+}
+
+.panelInlineButton {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.panelInlineSelect {
+  min-width: 190px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.themeColorField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.themeColorInput {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.themeColorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.themeColorInput::-webkit-color-swatch {
+  border: 2px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 50%;
+}
+
+.themeColorInput::-moz-color-swatch {
+  border: 2px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 50%;
+}
+
+.themeColorValue {
+  min-width: 70px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex: none;
+}
+
+.toggleSwitchInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSwitchTrack {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.toggleSwitchTrack::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.toggleSwitchInput:checked + .toggleSwitchTrack {
+  border-color: color-mix(in srgb, var(--accent) 74%, var(--panel-edge));
+  background: color-mix(in srgb, var(--accent) 24%, var(--panel));
+}
+
+.toggleSwitchInput:checked + .toggleSwitchTrack::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+.toggleSwitchInput:focus-visible + .toggleSwitchTrack {
+  outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  outline-offset: 2px;
+}
+
+.accomplishmentButtonEnable:hover {
+  background: var(--good);
+}
+
+.accomplishmentButtonDanger:hover {
+  background: var(--danger);
+}
+
+.accomplishmentButtonEnable:hover,
+.accomplishmentButtonDanger:hover {
+  color: var(--panel);
+  border-color: transparent;
+}
+
+.accomplishmentButton {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.editorLabel {
+  color: var(--text);
+}
+
+.editorLabelUnused {
+  text-decoration: line-through;
+}
+
+.editorInput {
+  padding: 8px 10px;
+  min-width: 160px;
+}
+
+.editorInputWide {
+  width: 100%;
+}
+
+.rangeInput {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rangeLabel {
+  white-space: nowrap;
+}
+
+.rangeInputInline {
+  flex: 1;
+  min-width: 120px;
+}
+
+.editorCheckbox {
+  width: 18px;
+  height: 18px;
+}
+
+.editorSwitch {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.editorSwitchInput {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.editorSwitchSlider {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  pointer-events: none;
+  position: relative;
+}
+
+.editorSwitchSlider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.editorSwitchInput:checked + .editorSwitchSlider {
+  border-color: var(--accent);
+  background: var(--accent-soft-bg);
+}
+
+.editorSwitchInput:checked + .editorSwitchSlider::after {
+  transform: translateX(20px);
+  background: var(--accent);
+}
+
+.editorSwitchInput:focus-visible + .editorSwitchSlider {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.editorTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  min-height: 180px;
+  overflow: hidden;
+  resize: none;
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  line-height: 1.5;
+}
+
+.startupTextarea {
+  width: 100%;
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.editorStatus {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.editorStatusSuccess {
+  color: var(--good);
+}
+
+.editorStatusError {
+  color: var(--danger);
+}

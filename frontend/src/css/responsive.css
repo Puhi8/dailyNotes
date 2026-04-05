@@ -1,0 +1,108 @@
+@media (max-width: 900px) {
+  .navbar {
+    height: auto;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .navLinks {
+    width: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 8px;
+    overflow-x: hidden;
+  }
+
+  .navLinks a {
+    white-space: nowrap;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 6px;
+  }
+
+  .navLabelFull {
+    display: none;
+  }
+
+  .navLabelShort {
+    display: inline;
+  }
+
+  .home,
+  .page {
+    padding: 24px 16px 32px;
+  }
+
+  .topWidgetFocus {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .topWidgetFocus > button {
+    flex: 1 1 0;
+    max-width: none;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .topWidgets {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .statsWidget {
+    flex: 0 0 50%;
+    min-width: fit-content;
+    scroll-snap-align: center;
+  }
+
+  .topWidgets.topWidgetsStacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .topWidgets.topWidgetsStacked .statsWidget {
+    flex: none;
+    min-width: 0;
+    scroll-snap-align: none;
+  }
+
+  .chartHeaderRow {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .chartActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .chartActions > button {
+    width: auto;
+    text-align: center;
+  }
+
+  .chartArea {
+    height: clamp(150px, 24vh, 300px);
+  }
+
+  .calendarWeekdays {
+    font-size: 10px;
+  }
+
+  .calendarDay {
+    height: 34px;
+    font-size: 13px;
+  }
+}

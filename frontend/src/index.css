@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "./css/layout.css";
+@import "./css/forms.css";
+@import "./css/notes.css";
+@import "./css/home.css";
+@import "./css/responsive.css";
+
+:root {
+  --panel: #23272f;
+  --panel-strong: #2c313a;
+  --panel-edge: #3a404b;
+  --text: #e6e3dc;
+  --muted: #a5a196;
+  --accent: #2fb890;
+  --accent-rgb: 47 184 144;
+  --accent-glow: rgba(47, 184, 144, 0.2);
+  --accent-soft-bg: rgba(47, 184, 144, 0.28);
+  --accent-surface: rgba(47, 184, 144, 0.12);
+  --accent-border: rgba(47, 184, 144, 0.7);
+  --good: #20d12f;
+  --warn: #f1d42d;
+  --danger: #eb3c2f;
+  --radius: 12px;
+  --nav-height: 64px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1100px 600px at 12% -10%, var(--accent-glow) 0%, rgba(35, 39, 47, 0) 65%),
+    radial-gradient(900px 600px at 90% 30%, rgba(242, 159, 88, 0.18) 0%, rgba(35, 39, 47, 0) 55%),
+    linear-gradient(160deg, var(--panel) 0%, var(--panel-strong) 100%);
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.stateCard,
+.panelCard,
+.statsWidget,
+.chartCard {
+  background: var(--panel-strong);
+  border: 1px solid var(--panel-edge);
+  box-shadow: 0 18px 40px rgba(58, 64, 75, 0.55);
+}
+
+.stateCard > h2,
+.pageHeader h1,
+.panelTitle,
+.noteMarkdown h2,
+.noteMarkdown h3,
+.noteMarkdown h4,
+.statsWidget > h3,
+.chartHeader h2 {
+  font-family: "Times New Roman", serif;
+}
+
+.lockInput,
+.editorInput,
+.editorTextarea,
+.calendarDay {
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 10px;
+}
+
+.page,
+.home {
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelSection,
+.editorList,
+.noteMarkdown,
+.calendarMonth {
+  display: grid;
+  gap: 10px;
+}
