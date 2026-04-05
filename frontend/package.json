@@ -13,7 +13,7 @@
     "android:icons": "bash ./scripts/sync-android-icon.sh",
     "android:sync": "npm run build && cap sync android && npm run android:icons",
     "android:open": "npm run android:sync && cap open android",
-    "android:build": "npm run android:sync && cap build android",
+    "android:build": "npm run android:sync && cd android && ./gradlew assembleRelease",
     "electron:add": "cap add @capacitor-community/electron",
     "electron:sync": "cap sync electron",
     "electron:open": "cap open electron",

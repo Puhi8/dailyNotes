@@ -26,11 +26,12 @@ BUILD_PATH="${BUILD_PATH:-./cmd/api}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-ghcr.io/puhi8/dailynotes}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 FRONTEND_DEPLOY_CMD="${FRONTEND_DEPLOY_CMD:-npm run deploy}"
-ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew assembleDebug}"
-ANDROID_APK_PATH="${ANDROID_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk}"
+ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew assembleRelease}"
+ANDROID_APK_PATH="${ANDROID_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-${VERSION}.apk}"
 ANDROID_LATEST_ASSET_NAME="${ANDROID_LATEST_ASSET_NAME:-${APP}-android.apk}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
+ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
 
 TARGETS=(
   "linux amd64"
@@ -132,6 +133,52 @@ resolve_android_java_home() {
   echo "Set ANDROID_JAVA_HOME or JAVA_HOME to a full JDK 21+ install."
   echo "Android Studio JBR usually works, for example: $HOME/.android-studio/jbr"
   exit 1
+}
+
+resolve_android_sdk_home() {
+  local candidate
+  local -a candidates=()
+
+  if [[ -n "$ANDROID_SDK_HOME" ]]; then
+    candidates+=("$ANDROID_SDK_HOME")
+  fi
+  if [[ -n "${ANDROID_HOME:-}" ]]; then
+    candidates+=("$ANDROID_HOME")
+  fi
+  if [[ -n "${ANDROID_SDK_ROOT:-}" ]]; then
+    candidates+=("$ANDROID_SDK_ROOT")
+  fi
+
+  candidates+=(
+    "$HOME/Android/Sdk"
+    "$HOME/Android/sdk"
+    "$HOME/Library/Android/sdk"
+    "$HOME/AppData/Local/Android/Sdk"
+    "$HOME/.android/sdk"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -d "$candidate/platforms" && -d "$candidate/build-tools" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  echo "No usable Android SDK found."
+  echo "Set ANDROID_SDK_HOME, ANDROID_HOME, or ANDROID_SDK_ROOT to your SDK path."
+  exit 1
+}
+
+write_android_local_properties() {
+  local android_sdk_home="$1"
+  local local_properties_path="$ANDROID_DIR/local.properties"
+  local escaped_sdk_dir
+
+  escaped_sdk_dir="${android_sdk_home//\\/\\\\}"
+  escaped_sdk_dir="${escaped_sdk_dir//:/\\:}"
+
+  printf 'sdk.dir=%s\n' "$escaped_sdk_dir" > "$local_properties_path"
 }
 
 write_checksum() {
@@ -305,15 +352,23 @@ docker_build() {
 ########################################
 build_android() {
   local android_java_home
+  local android_sdk_home
 
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
   ensure_android_project
   android_java_home="$(resolve_android_java_home)"
+  android_sdk_home="$(resolve_android_sdk_home)"
+  write_android_local_properties "$android_sdk_home"
   echo "Using Android JDK: $android_java_home"
+  echo "Using Android SDK: $android_sdk_home"
   (
     cd "$FRONTEND_DIR"
-    JAVA_HOME="$android_java_home" PATH="$android_java_home/bin:$PATH" npm run android:sync
+    JAVA_HOME="$android_java_home" \
+    ANDROID_HOME="$android_sdk_home" \
+    ANDROID_SDK_ROOT="$android_sdk_home" \
+    PATH="$android_java_home/bin:$android_sdk_home/platform-tools:$PATH" \
+    npm run android:sync
   )
   if [[ ! -f "$ANDROID_DIR/gradlew" ]]; then
     echo "No Gradle wrapper found at $ANDROID_DIR/gradlew"
@@ -322,7 +377,11 @@ build_android() {
   (
     cd "$ANDROID_DIR"
     chmod +x gradlew
-    JAVA_HOME="$android_java_home" PATH="$android_java_home/bin:$PATH" bash -lc "$ANDROID_BUILD_CMD"
+    JAVA_HOME="$android_java_home" \
+    ANDROID_HOME="$android_sdk_home" \
+    ANDROID_SDK_ROOT="$android_sdk_home" \
+    PATH="$android_java_home/bin:$android_sdk_home/platform-tools:$PATH" \
+    bash -lc "$ANDROID_BUILD_CMD"
   )
   if [[ ! -f "$ANDROID_APK_PATH" ]]; then
     echo "APK not found: $ANDROID_APK_PATH"
