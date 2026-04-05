@@ -90,22 +90,68 @@ check_git() {
   }
 }
 
-check_tag() {
-  local remote_refs
-  if git rev-parse "$VERSION" >/dev/null 2>&1; then
-    echo "Tag exists locally"
+tag_exists_locally() {
+  git show-ref --verify --quiet "refs/tags/$VERSION"
+}
+
+remote_tag_commit() {
+  local remote_ref remote_status
+
+  if remote_ref="$(git ls-remote --exit-code --tags "$REMOTE" "refs/tags/$VERSION^{}")"; then
+    printf '%s\n' "$remote_ref" | awk 'NR == 1 { print $1 }'
+    return 0
+  else
+    remote_status=$?
+  fi
+  if [[ $remote_status -ne 2 ]]; then
+    echo "Failed to query tags from remote '$REMOTE'"
     exit 1
   fi
-  if git remote get-url "$REMOTE" >/dev/null 2>&1; then
-    remote_refs="$(git ls-remote --tags "$REMOTE" "refs/tags/$VERSION")" || {
-      echo "Failed to query tags from remote '$REMOTE'"
-      exit 1
-    }
-    if [[ -n "$remote_refs" ]]; then
-      echo "Tag exists on remote"
+
+  if remote_ref="$(git ls-remote --exit-code --tags "$REMOTE" "refs/tags/$VERSION")"; then
+    printf '%s\n' "$remote_ref" | awk 'NR == 1 { print $1 }'
+    return 0
+  else
+    remote_status=$?
+  fi
+  if [[ $remote_status -ne 2 ]]; then
+    echo "Failed to query tags from remote '$REMOTE'"
+    exit 1
+  fi
+
+  return 1
+}
+
+check_tag() {
+  local head_commit local_tag_commit_value remote_commit
+
+  head_commit="$(git rev-parse HEAD)"
+  if tag_exists_locally; then
+    local_tag_commit_value="$(git rev-list -n 1 "$VERSION")"
+    if [[ "$local_tag_commit_value" != "$head_commit" ]]; then
+      echo "Tag exists locally but points to $local_tag_commit_value, not HEAD $head_commit"
       exit 1
     fi
+    echo "Reusing existing local tag $VERSION at $head_commit"
   fi
+
+  if git remote get-url "$REMOTE" >/dev/null 2>&1; then
+    if remote_commit="$(remote_tag_commit)"; then
+      if [[ "$remote_commit" != "$head_commit" ]]; then
+        echo "Tag exists on remote but points to $remote_commit, not HEAD $head_commit"
+        exit 1
+      fi
+      echo "Reusing existing remote tag $VERSION at $head_commit"
+    fi
+  fi
+}
+
+ensure_local_tag() {
+  if tag_exists_locally; then
+    return 0
+  fi
+
+  git tag -a "$VERSION" -m "$APP $VERSION"
 }
 
 collect_release_assets() {
@@ -242,7 +288,7 @@ create_release() {
     echo "No release assets found in $DIST_DIR"
     exit 1
   }
-  git tag -a "$VERSION" -m "$APP $VERSION"
+  ensure_local_tag
   git push "$REMOTE" "$VERSION"
   gh release create "$VERSION" \
     "${RELEASE_ASSETS[@]}" \
