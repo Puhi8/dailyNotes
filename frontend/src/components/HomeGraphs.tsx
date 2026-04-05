@@ -102,7 +102,7 @@ function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine,
           y2={chartSize.height || 300}
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="0%" stopColor="var(--good)" />
           <stop offset="50%" stopColor="var(--warn)" />
           <stop offset="100%" stopColor="var(--danger)" />
         </linearGradient>

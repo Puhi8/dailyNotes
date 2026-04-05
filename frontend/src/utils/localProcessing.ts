@@ -7,7 +7,6 @@ type localStorageSetter = {
 
 const inMemoryStorage = new Map<string, string>()
 export const isPersistentRuntime = () => (typeof window !== 'undefined' && Capacitor.isNativePlatform())
-const shouldPersistLocally = isPersistentRuntime
 
 export const manageLocalStorage = {
   set: (items: localStorageSetter[] | localStorageSetter) => {
@@ -16,7 +15,7 @@ export const manageLocalStorage = {
     for (const item of list) {
       const value = String(item.value)
       inMemoryStorage.set(item.key, value)
-      if (shouldPersistLocally()) window.localStorage.setItem(item.key, value)
+      if (isPersistentRuntime()) window.localStorage.setItem(item.key, value)
     }
   },
   remove: (keys: string | string[]) => {
@@ -24,7 +23,7 @@ export const manageLocalStorage = {
     const list = typeof keys === "string" ? [keys] : keys
     for (const key of list) {
       inMemoryStorage.delete(key)
-      if (shouldPersistLocally()) window.localStorage.removeItem(key)
+      if (isPersistentRuntime()) window.localStorage.removeItem(key)
     }
   },
   get: getLocalStorageItems
@@ -42,7 +41,7 @@ function getLocalStorageItems<T>(keys: string | string[], fallbackValue: T | str
   const getValue = (key: string) => {
     const memoryValue = inMemoryStorage.get(key)
     if (memoryValue != null) return parser ? parser(memoryValue) : memoryValue
-    if (!shouldPersistLocally()) return fallbackValue
+    if (!isPersistentRuntime()) return fallbackValue
     const raw = window.localStorage.getItem(key)
     if (raw == null) return fallbackValue
     inMemoryStorage.set(key, raw)

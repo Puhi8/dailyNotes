@@ -1,10 +1,11 @@
 import { Capacitor } from '@capacitor/core'
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../auth'
 import { api } from '../data/api'
 import { getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi } from '../data/noteSettings'
 import { useSecurity } from '../security'
 import { useObjectState } from '../utils/functions'
+import { HARDWARE_BACK_PRIORITY, registerHardwareBackHandler } from '../utils/hardwareBack'
 import { manageLocalStorage } from '../utils/localProcessing'
 
 const STARTUP_COMPLETE_KEY = 'dailynotes.startupComplete'
@@ -26,10 +27,11 @@ export default function StartupGate({ children }: { children: ReactNode }) {
   const [template, setTemplate] = useObjectState<{ draft: string; status: string; error: string | null }>({
     draft: "", status: "", error: null
   })
-  const [credentials, setCredentials] = useObjectState<{ password: string; status: string; error: string | null }>({
+  const [credentials, setCredentials, resetCredentials] = useObjectState<{ password: string; status: string; error: string | null }>({
     password: "", status: "idle", error: null
   })
-  const [server, setServer] = useState<{ draft: string; error: string | null }>({ draft: api.config.baseUrl.get(), error: null })
+  const [server, setServer] = useObjectState<{ draft: string; error: string | null }>({ draft: api.config.baseUrl.get(), error: null })
+  const [shouldShowCredentialsStep, setShouldShowCredentialsStep] = useState(true)
   const templateTouchedRef = useRef(false)
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function StartupGate({ children }: { children: ReactNode }) {
         setTemplate({ status: 'idle', error: err instanceof Error ? err.message : 'Failed to load note template.' })
       })
     return () => { active = false }
-  }, [step])
+  }, [setTemplate, step])
 
   const handlePinSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -80,8 +82,16 @@ export default function StartupGate({ children }: { children: ReactNode }) {
     event.preventDefault()
     const saved = api.config.baseUrl.set(server.draft)
     setServer({ draft: saved, error: null })
-    setCredentials({ password: "", status: "idle", error: null })
+    setShouldShowCredentialsStep(true)
+    resetCredentials()
     setStep('credentials')
+  }
+
+  const handleSkipServer = () => {
+    setServer({ error: null })
+    setShouldShowCredentialsStep(false)
+    resetCredentials()
+    setStep('template')
   }
 
   const handleCredentialsSubmit = async (event: FormEvent) => {
@@ -101,7 +111,7 @@ export default function StartupGate({ children }: { children: ReactNode }) {
         return acc
       }, {})
       await api.backup.applyPull(preview.remoteSnapshot, conflictChoices)
-      setCredentials({ password: "", status: "idle", error: null })
+      resetCredentials()
       setStep('template')
     }
     catch (err) { setCredentials({ status: "idle", error: err instanceof Error ? err.message : 'Failed to sign in and pull from server.' }) }
@@ -123,10 +133,10 @@ export default function StartupGate({ children }: { children: ReactNode }) {
     catch (err) { setTemplate({ error: err instanceof Error ? err.message : 'Failed to save note template.', status: "idle" }) }
   }
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     switch (step) {
       case "template":
-        setStep("credentials")
+        setStep(shouldShowCredentialsStep ? "credentials" : "server")
         return
       case "credentials":
         setStep("server")
@@ -141,7 +151,22 @@ export default function StartupGate({ children }: { children: ReactNode }) {
         window.history.back()
         return
     }
-  }
+  }, [shouldShowCredentialsStep, step])
+
+  useEffect(() => {
+    if (isComplete) return
+    return registerHardwareBackHandler(
+      HARDWARE_BACK_PRIORITY.NAVIGATION,
+      (_, processNextHandler) => {
+        if (step === 'pin') {
+          processNextHandler()
+          return
+        }
+        handleBack()
+      },
+      step === 'pin' ? 'delegated startup back to root flow' : 'navigated back in startup flow',
+    )
+  }, [handleBack, isComplete, step])
 
   if (!isNative || isComplete) return <>{children}</>
 
@@ -220,6 +245,9 @@ export default function StartupGate({ children }: { children: ReactNode }) {
               <button className="stateButton" type="submit">Continue</button>
               <button className="stateButton stateButtonSecondary" type="button" onClick={handleBack}>
                 Back
+              </button>
+              <button className="stateButton stateButtonSecondary" type="button" onClick={handleSkipServer}>
+                Skip
               </button>
             </div>
           </form>

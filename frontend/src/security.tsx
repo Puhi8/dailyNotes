@@ -16,6 +16,7 @@ type SecurityContextValue = {
   biometricReady: boolean
   biometricEnabled: boolean
   setBiometricEnabled: (enabled: boolean) => void
+  confirmBiometricIdentity: (reason?: string) => Promise<boolean>
   verifyPin: (pin: string) => boolean
   unlockWithPin: (pin: string, scope?: UnlockScope) => boolean
   unlockWithBiometrics: (scope?: UnlockScope) => Promise<boolean>
@@ -70,19 +71,25 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
 
   const verifyPin = useCallback((pin: string) => (hasPin && pin === effectivePin), [effectivePin, hasPin])
 
-  const unlockWithBiometrics = useCallback(async (scope: UnlockScope = 'app') => {
-    if (!biometric.enabled) return false
+  const confirmBiometricIdentity = useCallback(async (reason = 'Confirm biometric change') => {
     try {
       if (!Capacitor.isNativePlatform()) return false
       const availability = await NativeBiometric.isAvailable()
       if (!availability?.isAvailable) return false
-      await NativeBiometric.verifyIdentity({ reason: 'Unlock protected area' })
-      if (scope === 'home') setIsHomeUnlocked(true)
-      else setIsUnlocked(true)
+      await NativeBiometric.verifyIdentity({ reason })
       return true
     }
     catch { return false }
-  }, [biometric.enabled])
+  }, [])
+
+  const unlockWithBiometrics = useCallback(async (scope: UnlockScope = 'app') => {
+    if (!biometric.enabled) return false
+    const success = await confirmBiometricIdentity('Unlock protected area')
+    if (!success) return false
+    if (scope === 'home') setIsHomeUnlocked(true)
+    else setIsUnlocked(true)
+    return true
+  }, [biometric.enabled, confirmBiometricIdentity])
 
   const setDevicePin = useCallback((pin: string) => {
     const normalized = pin.trim()
@@ -118,13 +125,14 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
       biometricReady: biometric.ready,
       biometricEnabled: biometric.enabled,
       setBiometricEnabled,
+      confirmBiometricIdentity,
       verifyPin,
       unlockWithPin,
       unlockWithBiometrics,
       setDevicePin,
       lock,
     }),
-    [biometric.available, biometric.enabled, biometric.ready, deviceHasPin, hasPin, isHomeUnlocked, isUnlocked, lock, setBiometricEnabled, setDevicePin, unlockWithBiometrics, unlockWithPin, verifyPin]
+    [biometric.available, biometric.enabled, biometric.ready, confirmBiometricIdentity, deviceHasPin, hasPin, isHomeUnlocked, isUnlocked, lock, setBiometricEnabled, setDevicePin, unlockWithBiometrics, unlockWithPin, verifyPin]
   )
   return <SecurityContext.Provider value={value}>{children}</SecurityContext.Provider>
 }

@@ -3,15 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { api, type BackupConflictChoice, type BackupAccomplishmentChoice, type BackupPullPreview, type BackupSyncStatus } from '../data/api'
 import graph, { GRAPH_COMPACTNESS_MAX, GRAPH_COMPACTNESS_MIN, type GraphLineMode } from '../data/graph'
 import { getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi } from '../data/noteSettings'
+import theme, { DEFAULT_ACCENT_COLOR } from '../data/theme'
 import SettingsPopups, { type SettingsPopupKey } from './SettingsPopups'
 import { useSecurity } from '../security'
 import type { StatusOptions } from '../data/types'
 import { toUpperCase, useObjectState } from '../utils/functions'
+import { registerCloseOnBack } from '../utils/hardwareBack'
 
 type errorsType = {
   template: string | null
   server: string | null
   pin: string | null
+  biometric: string | null
   remoteCredentials: string | null
   backupPull: string | null
 }
@@ -26,6 +29,7 @@ type stateType = {
   editingServer: boolean
   syncingNow: boolean
   editingPin: boolean
+  confirmingBiometric: boolean
   editingRemote: boolean
   pulling: boolean
   editingPull: boolean
@@ -64,13 +68,13 @@ function convertStateObjectToText(state: stateType, pullPreview: BackupPullPrevi
 }
 
 function summarizeConflictDay(source: { note: string; data: Record<string, unknown> }) {
-  return `${Object.keys(source.data ?? {}).length} tasks, ${source.note.trim() ? 'has note' : 'no note'}`
+  return `${Object.keys(source.data ?? {}).length} tasks, ${source.note.trim() ? 'has' : 'no'} note`
 }
 
 export default function Settings() {
   const navigate = useNavigate()
-  const { hasDevicePin, biometricAvailable, biometricEnabled, setBiometricEnabled, verifyPin, setDevicePin, lock } = useSecurity()
-  const [errors, setErrors] = useObjectState<errorsType>({ template: null, server: null, pin: null, remoteCredentials: null, backupPull: null })
+  const { hasDevicePin, biometricAvailable, biometricReady, biometricEnabled, setBiometricEnabled, confirmBiometricIdentity, verifyPin, setDevicePin, lock } = useSecurity()
+  const [errors, setErrors] = useObjectState<errorsType>({ template: null, server: null, pin: null, biometric: null, remoteCredentials: null, backupPull: null })
   const [noteTemplate, setNoteTemplateState] = useState(() => getNoteTemplate())
   const [apiBaseUrl, setApiBaseUrlState] = useState(() => api.config.baseUrl.get())
   const [serverDraft, setServerDraft] = useState(apiBaseUrl)
@@ -79,9 +83,10 @@ export default function Settings() {
   const [graphCompactness, setGraphCompactnessState] = useState(() => graph.settings.line.compactness.get())
   const [graphLineMode, setGraphLineModeState] = useState<GraphLineMode>(() => graph.settings.line.mode.get())
   const [graphHeatmapUseMultiColor, setGraphHeatmapUseMultiColorState] = useState(() => graph.settings.heatmap.multiColor.get())
+  const [accentColor, setAccentColorState] = useState(() => theme.settings.accent.get())
   const [status, setStatus] = useObjectState<statusType>({ template: 'idle', remoteCredentials: 'idle' })
   const [state, setState] = useObjectState<stateType>({
-    editingServer: false, syncingNow: false, editingPin: false, editingRemote: false, pulling: false, editingPull: false, applyingPull: false
+    editingServer: false, syncingNow: false, editingPin: false, confirmingBiometric: false, editingRemote: false, pulling: false, editingPull: false, applyingPull: false
   })
   const [pin, setPin, resetPin] = useObjectState<pinType>({ current: "", draft: "", confirm: "" })
   const [serverCredentials, setServerCredentials, resetServerCredentials] = useObjectState<serverCredentials>({ password: "", passwordConfirm: "", currentServerPassword: "", })
@@ -89,9 +94,7 @@ export default function Settings() {
   const activePopup: SettingsPopupKey = convertStateObjectToText(state, pull.preview)
 
   useEffect(() => {
-    if (!activePopup) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+    if (activePopup) return registerCloseOnBack(() => {
       switch (activePopup) {
         case "pull":
           setState({ editingPull: false, applyingPull: false })
@@ -106,9 +109,7 @@ export default function Settings() {
           return
       }
       setState({ editingServer: false })
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    })
   }, [activePopup, resetPull, setErrors, setState])
 
   useEffect(() => {
@@ -284,6 +285,30 @@ export default function Settings() {
     setDevicePin(normalized)
   }
 
+  const handleToggleBiometric = async () => {
+    if (state.confirmingBiometric) return
+    setErrors({ biometric: null })
+    if (!biometricReady) {
+      setErrors({ biometric: 'Checking biometric availability.' })
+      return
+    }
+    if (!biometricAvailable) {
+      setErrors({ biometric: 'Biometric unlock is not available on this device.' })
+      return
+    }
+    const nextEnabled = !biometricEnabled
+    setState({ confirmingBiometric: true })
+    try {
+      const confirmed = await confirmBiometricIdentity(nextEnabled ? 'Enable biometric unlock' : 'Disable biometric unlock')
+      if (!confirmed) {
+        setErrors({ biometric: 'Biometric confirmation failed.' })
+        return
+      }
+      setBiometricEnabled(nextEnabled)
+    }
+    finally { setState({ confirmingBiometric: false }) }
+  }
+
   const saveTemplateValue = async (value: string) => {
     setErrors({ template: null })
     setStatus({ template: "saving" })
@@ -306,6 +331,34 @@ export default function Settings() {
   return (
     <div className="page">
       <section className="panelCard panelStack">
+        <div className="panelSection">
+          <h2 className="panelTitle">Appearance</h2>
+          <div className="panelRow panelRowTopAlign">
+            <div className="panelRowLabelGroup">
+              <span>Accent color</span>
+            </div>
+            <span className="panelRowValue panelRowValueTheme">
+              <label className="themeColorField" htmlFor="accent-color">
+                <input
+                  id="accent-color"
+                  className="themeColorInput"
+                  type="color"
+                  value={accentColor}
+                  onChange={e => setAccentColorState(theme.settings.accent.set(e.target.value))}
+                />
+                <span className="themeColorValue">{accentColor.toUpperCase()}</span>
+              </label>
+              <button
+                className="stateButton stateButtonSecondary panelInlineButton"
+                type="button"
+                onClick={() => confirm("Do you really want to reset your color?") && setAccentColorState(theme.settings.accent.reset())}
+                disabled={accentColor === DEFAULT_ACCENT_COLOR}
+              >
+                Reset
+              </button>
+            </span>
+          </div>
+        </div>
         <div className="panelSection">
           <h2 className="panelTitle">Graphs settings</h2>
           <div className="rangeRow">
@@ -433,18 +486,21 @@ export default function Settings() {
           </div>
           <div className="panelRow">
             <span>Biometric</span>
-            <span className="panelRowValue">
-              {biometricAvailable ? (biometricEnabled ? 'Enabled' : 'Disabled') : 'Unavailable'}
-              {biometricEnabled && <button
-                className="stateButton stateButtonSecondary panelInlineButton"
-                type="button"
-                onClick={() => setBiometricEnabled(false)}
-              >
-                Disable
-              </button>
-              }
+            <span className="panelRowValue panelRowValueToggle">
+              {state.confirmingBiometric ? 'Confirming...' : biometricReady ? biometricAvailable ? (biometricEnabled ? 'Enabled' : 'Disabled') : 'Unavailable' : 'Checking...'}
+              {(!biometricReady || biometricAvailable) && <label className="toggleSwitch" aria-label="Toggle biometric unlock">
+                <input
+                  className="toggleSwitchInput"
+                  type="checkbox"
+                  checked={biometricEnabled}
+                  onChange={() => { void handleToggleBiometric() }}
+                  disabled={!biometricReady || state.confirmingBiometric}
+                />
+                <span className="toggleSwitchTrack" />
+              </label>}
             </span>
           </div>
+          {errors.biometric && <div className="stateMeta stateMetaError">{errors.biometric}</div>}
           <button className="stateButton" onClick={() => lock()}>Lock now</button>
         </div>
         <div className="panelSection">

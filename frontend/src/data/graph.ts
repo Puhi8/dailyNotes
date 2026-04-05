@@ -2,6 +2,7 @@ import { manageLocalStorage } from "../utils/localProcessing"
 import type { DayEntry } from './types'
 import { formatDateKey } from "../utils/functions"
 import { months } from "./data"
+import { getAccentColorRgb } from './theme'
 
 const GRAPH_SETTINGS_KEY = 'dailynotes.graphSettings'
 
@@ -206,7 +207,8 @@ const getSingleHueHeatmapColor = (value: number) => {
   const minAlpha = 0.14
   const maxAlpha = 0.92
   const alpha = minAlpha + (maxAlpha - minAlpha) * ratio
-  return `rgba(47, 184, 144, ${alpha.toFixed(3)})`
+  const { r, g, b } = getAccentColorRgb()
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`
 }
 
 export default {

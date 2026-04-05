@@ -10,15 +10,17 @@ import Notes from './pages/Notes'
 import NoteDetail from './pages/NoteDetail'
 import Settings from './pages/Settings'
 import SingleDay from './pages/SingleDay'
+import { useAndroidBackButton } from './utils/hardwareBack'
 
 export default function App() {
   return <AuthProvider>
     <SecurityProvider>
-      <StartupGate>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AndroidBackButtonBridge />
+        <StartupGate>
           <AppShell />
-        </BrowserRouter>
-      </StartupGate>
+        </StartupGate>
+      </BrowserRouter>
     </SecurityProvider>
   </AuthProvider>
 }
@@ -51,6 +53,7 @@ const navbarItems = [
 function AppShell() {
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+
   return <div className="appShell">
     {isAuthenticated && location.pathname !== '/login' && <nav className="navbar">
       <div className="navLinks">
@@ -85,6 +88,11 @@ function AppShell() {
       </Routes>
     </main>
   </div>
+}
+
+function AndroidBackButtonBridge() {
+  useAndroidBackButton()
+  return null
 }
 
 function HomeGate() {

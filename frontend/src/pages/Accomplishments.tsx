@@ -3,6 +3,7 @@ import { api, type AccomplishmentItem } from '../data/api'
 import ErrorState from '../components/ErrorState'
 import { useObjectState } from '../utils/functions'
 import { normalizeAccomplishmentType } from '../data/localCore'
+import { registerCloseOnBack } from '../utils/hardwareBack'
 
 const accomplishmentTypeLabel = (value: string) => (normalizeAccomplishmentType(value) === 'text' ? 'Text' : 'Checkbox')
 const moveItem = (list: AccomplishmentItem[], sourceIndex: number, targetIndex: number) => {
@@ -43,17 +44,18 @@ export default function Accomplishments() {
   const [movedMarker, setMovedMarker] = useState<{ id: number; direction: -1 | 1 } | null>(null)
 
   useEffect(() => {
-    if (!editingItem) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+    if (editingItem) return registerCloseOnBack(() => {
+      if (confirmingForceDelete) {
+        setConfirmingForceDelete(false)
+        setErrors({ edit: null, action: null })
+        return
+      }
       setEditingItem(null)
       setConfirmingForceDelete(false)
       setForm({ editName: '', editType: '' })
-      setErrors({ edit: null })
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [editingItem, setErrors, setForm])
+      setErrors({ edit: null, action: null })
+    }, undefined, confirmingForceDelete ? 'closed confirmation flow' : 'closed overlay')
+  }, [confirmingForceDelete, editingItem, setErrors, setForm])
 
   useEffect(() => {
     let cancelled = false
@@ -68,7 +70,7 @@ export default function Accomplishments() {
       .catch(err => { if (!cancelled) setErrors({ general: err instanceof Error ? err.message : 'Request failed' }) })
       .finally(() => { if (!cancelled) setForm({ isLoading: false }) })
     return () => { cancelled = true }
-  }, [reloadToken])
+  }, [reloadToken, setErrors, setForm])
 
   useEffect(() => {
     if (!movedMarker) return

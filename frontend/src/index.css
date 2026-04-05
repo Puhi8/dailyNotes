@@ -7,6 +7,11 @@
   --text: #e6e3dc;
   --muted: #a5a196;
   --accent: #2fb890;
+  --accent-rgb: 47 184 144;
+  --accent-glow: rgba(47, 184, 144, 0.2);
+  --accent-soft-bg: rgba(47, 184, 144, 0.28);
+  --accent-surface: rgba(47, 184, 144, 0.12);
+  --accent-border: rgba(47, 184, 144, 0.7);
   --good: #20d12f;
   --warn: #f1d42d;
   --danger: #eb3c2f;
@@ -24,7 +29,7 @@ body {
   font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(1100px 600px at 12% -10%, rgba(47, 184, 144, 0.2) 0%, rgba(35, 39, 47, 0) 65%),
+    radial-gradient(1100px 600px at 12% -10%, var(--accent-glow) 0%, rgba(35, 39, 47, 0) 65%),
     radial-gradient(900px 600px at 90% 10%, rgba(242, 159, 88, 0.18) 0%, rgba(35, 39, 47, 0) 55%),
     linear-gradient(160deg, var(--panel) 0%, var(--panel-strong) 100%);
   background-attachment: fixed;
@@ -363,6 +368,52 @@ body {
   flex-wrap: nowrap;
 }
 
+.panelRowValueTheme {
+  align-items: center;
+}
+
+.themeColorField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.themeColorInput {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.themeColorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.themeColorInput::-webkit-color-swatch {
+  border: 2px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 50%;
+}
+
+.themeColorInput::-moz-color-swatch {
+  border: 2px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 50%;
+}
+
+.themeColorValue {
+  min-width: 70px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .toggleSwitch {
   position: relative;
   display: inline-block;
@@ -604,7 +655,7 @@ body {
 
 .editorSwitchInput:checked+.editorSwitchSlider {
   border-color: var(--accent);
-  background: rgba(47, 184, 144, 0.28);
+  background: var(--accent-soft-bg);
 }
 
 .editorSwitchInput:checked+.editorSwitchSlider::after {
@@ -780,8 +831,8 @@ body {
 }
 
 .calendarDayHasNote {
-  border-color: rgba(47, 184, 144, 0.7);
-  background: rgba(47, 184, 144, 0.12);
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
 }
 
 .calendarDayEmptyNote {
