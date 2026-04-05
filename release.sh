@@ -30,6 +30,7 @@ ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew assembleDebug}"
 ANDROID_APK_PATH="${ANDROID_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk}"
 ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-${VERSION}.apk}"
 ANDROID_LATEST_ASSET_NAME="${ANDROID_LATEST_ASSET_NAME:-${APP}-android.apk}"
+ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 
 TARGETS=(
   "linux amd64"
@@ -81,6 +82,56 @@ ensure_android_project() {
     cd "$FRONTEND_DIR"
     npx cap add android
   )
+}
+
+java_major_version() {
+  local version
+  version="$("$1" -version 2>&1 | awk '/^javac / { print $2; exit }')"
+  version="${version%\"}"
+  version="${version#\"}"
+  if [[ "$version" =~ ^1\.([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if [[ "$version" =~ ^([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
+resolve_android_java_home() {
+  local candidate major
+  local -a candidates=()
+
+  if [[ -n "$ANDROID_JAVA_HOME" ]]; then
+    candidates+=("$ANDROID_JAVA_HOME")
+  fi
+  if [[ -n "${JAVA_HOME:-}" ]]; then
+    candidates+=("$JAVA_HOME")
+  fi
+  candidates+=("$HOME/.android-studio/jbr")
+
+  if [[ -d /usr/lib/jvm ]]; then
+    while IFS= read -r candidate; do
+      candidates+=("$candidate")
+    done < <(find /usr/lib/jvm -mindepth 1 -maxdepth 1 -type d | sort)
+  fi
+
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    [[ -x "$candidate/bin/java" && -x "$candidate/bin/javac" ]] || continue
+    major="$(java_major_version "$candidate/bin/javac")" || continue
+    if (( major >= 21 )); then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  echo "No usable JDK 21+ found for Android build."
+  echo "Set ANDROID_JAVA_HOME or JAVA_HOME to a full JDK 21+ install."
+  echo "Android Studio JBR usually works, for example: $HOME/.android-studio/jbr"
+  exit 1
 }
 
 write_checksum() {
@@ -253,12 +304,16 @@ docker_build() {
 # Android APK
 ########################################
 build_android() {
+  local android_java_home
+
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
   ensure_android_project
+  android_java_home="$(resolve_android_java_home)"
+  echo "Using Android JDK: $android_java_home"
   (
     cd "$FRONTEND_DIR"
-    npm run android:sync
+    JAVA_HOME="$android_java_home" PATH="$android_java_home/bin:$PATH" npm run android:sync
   )
   if [[ ! -f "$ANDROID_DIR/gradlew" ]]; then
     echo "No Gradle wrapper found at $ANDROID_DIR/gradlew"
@@ -267,7 +322,7 @@ build_android() {
   (
     cd "$ANDROID_DIR"
     chmod +x gradlew
-    bash -lc "$ANDROID_BUILD_CMD"
+    JAVA_HOME="$android_java_home" PATH="$android_java_home/bin:$PATH" bash -lc "$ANDROID_BUILD_CMD"
   )
   if [[ ! -f "$ANDROID_APK_PATH" ]]; then
     echo "APK not found: $ANDROID_APK_PATH"
