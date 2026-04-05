@@ -1,0 +1,49 @@
+{
+  "name": "package.json",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "homepage": "https://Puhi8.github.io/dailyNotes",
+  "scripts": {
+    "dev": "vite --port 9998",
+    "build": "tsc -b && vite build",
+    "deploy": "VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/dailyNotes/ npm run build && gh-pages -d dist -r https://github.com/Puhi8/dailyNotes.git",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "android:icons": "bash ./scripts/sync-android-icon.sh",
+    "android:sync": "npm run build && cap sync android && npm run android:icons",
+    "android:open": "npm run android:sync && cap open android",
+    "android:build": "npm run android:sync && cap build android",
+    "electron:add": "cap add @capacitor-community/electron",
+    "electron:sync": "cap sync electron",
+    "electron:open": "cap open electron",
+    "windows:build": "cap sync electron && npm --prefix electron run build"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.0.1",
+    "@capacitor/core": "^8.0.1",
+    "@capgo/capacitor-native-biometric": "^8.3.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.1",
+    "recharts": "^3.6.0"
+  },
+  "devDependencies": {
+    "@capacitor-community/electron": "^5.0.1",
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4",
+    "gh-pages": "^6.3.0"
+  }
+}
