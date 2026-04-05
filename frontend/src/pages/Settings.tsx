@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AutoResizeTextarea from '../components/AutoResizeTextarea'
 import { api, type BackupConflictChoice, type BackupAccomplishmentChoice, type BackupPullPreview, type BackupSyncStatus } from '../data/api'
 import graph, { GRAPH_COMPACTNESS_MAX, GRAPH_COMPACTNESS_MIN, type GraphLineMode } from '../data/graph'
 import { getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi } from '../data/noteSettings'
@@ -506,7 +507,7 @@ export default function Settings() {
         <div className="panelSection">
           <h2 className="panelTitle">Notes</h2>
           <label className="panelLabel" htmlFor="note-template">Default note style</label>
-          <textarea
+          <AutoResizeTextarea
             id="note-template"
             className="editorTextarea"
             placeholder="Example: ## Highlights&#10;- item one&#10;- item two"

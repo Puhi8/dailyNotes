@@ -7,11 +7,11 @@
 ## GitHub Pages
 - Static hosting works when the production web build uses hash routing.
 - Easiest build command:
-  `npm run build:github-pages`
+  `VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/dailyNotes/ npm run build`
 - Build for a project site with:
-  `VITE_PUBLIC_BASE_PATH=/your-repo-name/ npm run build:github-pages`
+  `VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/your-repo-name/ npm run build`
 - Build for a user/org site root with:
-  `VITE_PUBLIC_BASE_PATH=/ npm run build:github-pages`
+  `VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/ npm run build`
 - If you deploy from GitHub Actions, `VITE_PUBLIC_BASE_PATH` can usually be omitted because the Vite config derives the project-site base path from `GITHUB_REPOSITORY`.
 - In GitHub Pages mode, routes look like `/#/settings`, which avoids server-side 404s on refresh/direct links.
 

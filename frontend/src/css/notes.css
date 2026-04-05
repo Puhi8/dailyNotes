@@ -1,0 +1,139 @@
+.noteList {
+  display: grid;
+  gap: 14px;
+}
+
+.noteEntry {
+  padding: 14px 16px;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  display: grid;
+  gap: 8px;
+}
+
+.noteHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.noteDate {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.noteBody {
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.noteBodyLarge {
+  font-size: 15px;
+}
+
+.noteEmpty {
+  color: var(--muted);
+}
+
+.noteActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.noteMarkdown {
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.noteMarkdown h2,
+.noteMarkdown h3,
+.noteMarkdown h4 {
+  margin: 0;
+}
+
+.noteMarkdown h2 {
+  font-size: 20px;
+}
+
+.noteMarkdown h3 {
+  font-size: 17px;
+}
+
+.noteMarkdown h4 {
+  font-size: 15px;
+}
+
+.noteMarkdown p {
+  margin: 0;
+}
+
+.noteMarkdown ul,
+.noteMarkdown ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.noteMarkdown li {
+  margin: 0;
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.calendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.calendarWeekday {
+  text-align: center;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendarDay {
+  height: 38px;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calendarDayHasNote {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+}
+
+.calendarDayEmptyNote {
+  color: var(--muted);
+}
+
+.calendarDayInactive {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendarDayBlank {
+  border: none;
+  background: transparent;
+  pointer-events: none;
+  cursor: default;
+}

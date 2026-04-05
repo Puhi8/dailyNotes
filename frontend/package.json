@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "vite --port 9998",
     "build": "tsc -b && vite build",
-    "deploy": "VITE_ROUTER_MODE=hash npm run build && gh-pages -d dist -r https://github.com/Puhi8/dailyNotes.git",
+    "deploy": "VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/dailyNotes/ npm run build && gh-pages -d dist -r https://github.com/Puhi8/dailyNotes.git",
     "lint": "eslint .",
     "preview": "vite preview",
-    "android:sync": "npm run build && cap sync android",
+    "android:icons": "bash ./scripts/sync-android-icon.sh",
+    "android:sync": "npm run build && cap sync android && npm run android:icons",
     "android:open": "npm run android:sync && cap open android",
     "android:build": "npm run android:sync && cap build android",
     "electron:add": "cap add @capacitor-community/electron",

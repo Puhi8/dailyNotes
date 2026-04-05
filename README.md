@@ -1,111 +1,61 @@
 # Daily Notes
 
-Daily Notes is an offline-first notes and daily-tracking app with an optional single-user backup API.
+Offline-first daily notes and tracking app with an optional backup API.
 
-It is split into:
-- a React frontend (`frontend`)
-- a Go backend (`cmd/api`) backed by SQLite
-- a legacy data migration tool (`cmd/migrate_legacy`)
+## Quick Start
 
-## Highlights
+### [Download the latest Android APK](https://github.com/Puhi8/dailyNotes/releases/latest/download/dailynotes-android.apk)
 
-- Offline-first local data storage on the device.
-- Optional remote backup sync (`/backup/snapshot`) with conflict-aware pull support in the frontend.
-- Device unlock support in the app flow (PIN + optional biometrics on native builds).
-- Single-user-per-database backend model.
+### Docker compose
 
-## Quick Start (Local Development)
+```yaml
+services:
+  dailynotes:
+    image: ghcr.io/puhi8/dailynotes:latest
+    restart: unless-stopped
+    ports:
+      - "5789:5789"
+    volumes:
+      - dailynotes-data:/data
 
-### 1) Run backend
-
-```bash
-go run ./cmd/api <data-dir>
+volumes:
+  dailynotes-data:
 ```
 
-Example:
+### Download binary
+
+Download the latest compiled backend binary in current directory.
+The installer always pulls the latest matching release for your OS and architecture:
 
 ```bash
-go run ./cmd/api ./backup
+curl -fsSL https://raw.githubusercontent.com/Puhi8/dailyNotes/main/install-api.sh | bash
 ```
 
-Backend listens on `0.0.0.0:5789`.
-
-### 2) Run frontend
+Run it with:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+./dailynotes ./data
 ```
-
-Frontend dev server runs on `http://localhost:9998` by default.
 
 ## First Login
 
-On first backend start, a password file is created automatically:
-- path: `<data-dir>/password`
-- value: random 2-10 character code
+On first backend start, a password file is created at `<data-dir>/password`.
 
-Use that password on the Login page. After login, you can change remote credentials from:
-`Settings -> Server -> Remote credentials`
+Use that password on the Login page. After login, you can change remote credentials in:
+`Settings -> Server -> Remote credentials` or just modifying the password file.
 
-Legacy `<data-dir>/passcode` is no longer used.
-
-## Run with Docker
-
-Build image:
-
-```bash
-docker build -t dailynotes-api .
-```
-
-Run container with persistent data:
-
-```bash
-docker run --name dailynotes-api \
-  -p 5789:5789 \
-  -v dailynotes-data:/data \
-  dailynotes-api
-```
-
-Container notes:
-- API binary starts as `/app/dailynotes-api /data`.
-- Database and generated password file are stored in `/data`.
-
-## Configuration
-
-### Backend environment variables
-
-- `DAILYNOTES_CORS_ORIGIN`: allowed CORS origins (`*`, CSV, or host/origin list).
-- `DAILYNOTES_TLS_CERT_FILE`: path to TLS certificate file.
-- `DAILYNOTES_TLS_KEY_FILE`: path to TLS private key file.
-
-To enable TLS, set both TLS variables.
-
-### Frontend environment variables
-
-- `VITE_API_BASE_URL`: backend base URL (defaults to `http://localhost:5789`).
-- `VITE_ROUTER_MODE`: set to `hash` for static hosts like GitHub Pages.
-- `VITE_PUBLIC_BASE_PATH`: optional base path for subpath deploys such as `/repo-name/`.
-
-## Build
+## Local Dev
 
 Backend:
 
 ```bash
-go build ./cmd/api
+go run ./cmd/api ./data # Listens on port 5789
 ```
 
-Frontend production bundle:
+Frontend:
 
 ```bash
 cd frontend
-npm run build
-```
-
-GitHub Pages-friendly frontend build:
-
-```bash
-cd frontend
-VITE_ROUTER_MODE=hash npm run build
+npm install
+npm run dev # Listens on port 9998
 ```
