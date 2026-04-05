@@ -70,6 +70,19 @@ check_frontend_deps() {
   fi
 }
 
+ensure_android_project() {
+  if [[ -d "$ANDROID_DIR" ]]; then
+    return 0
+  fi
+
+  require_cmd npx
+  echo "Android project not found at $ANDROID_DIR; running npx cap add android..."
+  (
+    cd "$FRONTEND_DIR"
+    npx cap add android
+  )
+}
+
 write_checksum() {
   local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -242,6 +255,7 @@ docker_build() {
 build_android() {
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
+  ensure_android_project
   (
     cd "$FRONTEND_DIR"
     npm run android:sync
