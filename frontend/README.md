@@ -30,7 +30,7 @@
 - Build the web bundle: `npm run build`
 - Sync native plugins: `npm run android:sync`
 - Open Android Studio: `npm run android:open`
-- Build the raw release APK: `npm run android:build`
+- Build an installable release APK: `npm run android:build`
 
 ## Windows (Electron via Capacitor)
 - Build the web bundle: `npm run build`

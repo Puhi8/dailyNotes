@@ -29,10 +29,16 @@ DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 FRONTEND_DEPLOY_CMD="${FRONTEND_DEPLOY_CMD:-npm run deploy}"
 
 ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew assembleRelease}"
-ANDROID_APK_PATH="${ANDROID_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-android.apk}"
+ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
+ANDROID_APK_PATH="${ANDROID_APK_PATH:-$DIST_DIR/$ANDROID_ASSET_NAME}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
+ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
+ANDROID_KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
+ANDROID_KEYSTORE_PASS="${ANDROID_KEYSTORE_PASS:-android}"
+ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-androiddebugkey}"
+ANDROID_KEY_PASS="${ANDROID_KEY_PASS:-android}"
 
 GHCR_USERNAME="${GHCR_USERNAME:-${GITHUB_ACTOR:-}}"
 GHCR_TOKEN="${GHCR_TOKEN:-${CR_PAT:-${GITHUB_TOKEN:-}}}"
@@ -56,7 +62,6 @@ require_cmd() {
 run_cmd_in_dir() {
   local dir="$1"
   local cmd="$2"
-
   (
     cd "$dir"
     bash -lc "$cmd"
@@ -190,6 +195,21 @@ resolve_android_sdk_home() {
   die "No usable Android SDK found. Set ANDROID_SDK_HOME, ANDROID_HOME, or ANDROID_SDK_ROOT."
 }
 
+resolve_apksigner() {
+  local sdk_home="$1"
+  local apksigner
+
+  if [[ -n "$ANDROID_APKSIGNER" ]]; then
+    [[ -x "$ANDROID_APKSIGNER" ]] || die "Android apksigner not executable: $ANDROID_APKSIGNER"
+    printf '%s\n' "$ANDROID_APKSIGNER"
+    return 0
+  fi
+
+  apksigner="$(find "$sdk_home/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort | tail -n 1)"
+  [[ -n "$apksigner" ]] || die "Could not find apksigner under $sdk_home/build-tools"
+  printf '%s\n' "$apksigner"
+}
+
 write_android_local_properties() {
   local sdk_home="$1"
   local escaped_sdk_home
@@ -213,6 +233,31 @@ run_android_cmd() {
     cd "$dir"
     bash -lc "$cmd"
   )
+}
+
+sign_android_apk() {
+  local sdk_home="$1"
+  local apksigner
+
+  apksigner="$(resolve_apksigner "$sdk_home")"
+  [[ -f "$ANDROID_KEYSTORE_PATH" ]] || die "Android keystore not found: $ANDROID_KEYSTORE_PATH"
+
+  if [[ "$ANDROID_KEYSTORE_PATH" == "$HOME/.android/debug.keystore" && "$ANDROID_KEY_ALIAS" == "androiddebugkey" ]]; then
+    echo "Signing Android APK with debug keystore..."
+  else
+    echo "Signing Android APK with keystore: $ANDROID_KEYSTORE_PATH"
+  fi
+
+  rm -f "$ANDROID_APK_PATH"
+  "$apksigner" sign \
+    --ks "$ANDROID_KEYSTORE_PATH" \
+    --ks-key-alias "$ANDROID_KEY_ALIAS" \
+    --ks-pass "pass:$ANDROID_KEYSTORE_PASS" \
+    --key-pass "pass:$ANDROID_KEY_PASS" \
+    --out "$ANDROID_APK_PATH" \
+    "$ANDROID_UNSIGNED_APK_PATH"
+
+  "$apksigner" verify "$ANDROID_APK_PATH" >/dev/null || die "Signed APK verification failed"
 }
 
 login_docker_registry() {
@@ -280,8 +325,8 @@ build_android() {
   run_android_cmd "$java_home" "$sdk_home" "$FRONTEND_DIR" "npm run android:sync"
   [[ -f "$ANDROID_DIR/gradlew" ]] || die "No Gradle wrapper found at $ANDROID_DIR/gradlew"
   run_android_cmd "$java_home" "$sdk_home" "$ANDROID_DIR" "chmod +x gradlew && $ANDROID_BUILD_CMD"
-  [[ -f "$ANDROID_APK_PATH" ]] || die "APK not found: $ANDROID_APK_PATH"
-  cp "$ANDROID_APK_PATH" "$DIST_DIR/$ANDROID_ASSET_NAME"
+  [[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
+  sign_android_apk "$sdk_home"
   echo "APK copied to:"
   echo "  $DIST_DIR/$ANDROID_ASSET_NAME"
 }
