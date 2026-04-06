@@ -131,9 +131,10 @@
   cursor: default;
 }
 
-.calendarDayBlank {
+.calendarDay.calendarDayBlank {
   border: none;
   background: transparent;
   pointer-events: none;
   cursor: default;
+  visibility: hidden;
 }
