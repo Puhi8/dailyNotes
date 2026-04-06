@@ -24,8 +24,7 @@ volumes:
 
 ### Download binary
 
-Download the latest compiled backend binary in current directory.
-The installer always pulls the latest matching release for your OS and architecture:
+Download the latest compiled backend binary in current directory (there is no windows version).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Puhi8/dailyNotes/main/install-api.sh | bash
