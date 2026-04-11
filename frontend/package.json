@@ -2,7 +2,6 @@
   "name": "package.json",
   "private": true,
   "version": "2.0.1.2",
-  "androidVersionCode": 2000102,
   "type": "module",
   "homepage": "https://Puhi8.github.io/dailyNotes",
   "scripts": {
@@ -16,7 +15,6 @@
     "android:sync": "bash ./scripts/prepare-android-project.sh",
     "android:open": "npm run android:sync && cap open android",
     "android:build": "bash ./scripts/build-android-apk.sh",
-    "android:build:fdroid": "bash ./scripts/build-android-fdroid.sh",
     "electron:add": "cap add @capacitor-community/electron",
     "electron:sync": "cap sync electron",
     "electron:open": "cap open electron",
