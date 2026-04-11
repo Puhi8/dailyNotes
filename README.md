@@ -36,45 +36,13 @@ Run it with:
 ./dailynotes ./data
 ```
 
-## First Login
+## First server login
 
 On first backend start, a password file is created at `<data-dir>/password`.
 
 Use that password on the Login page. After login, you can change remote credentials in:
 `Settings -> Server -> Remote credentials` or just modifying the password file.
 
-## Local Dev
+## Manual Running / Building
 
-Backend:
-
-```bash
-cd api
-go run ./cmd/api ../data # Listens on port 5789
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev # Listens on port 9998
-```
-
-## Build It Yourself
-
-Prerequisites: Go, Node.js/npm, JDK 21+, Android SDK, and ImageMagick for Android launcher icon generation.
-
-Build the API:
-
-```bash
-cd api
-go build -trimpath -ldflags='-s -w' -o ../dailynotes ./cmd/api
-```
-
-Build the Android APK (to the `./dist` dir):
-
-```bash
-cd frontend
-npm install
-npm run android:build
-```
+For local development and build-from-source instructions, see [DoThingsManually.md](./DoThingsManually.md).
