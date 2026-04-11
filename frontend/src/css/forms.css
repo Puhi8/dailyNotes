@@ -51,6 +51,22 @@
   font-size: 16px;
 }
 
+:is(input.lockInput, textarea.lockInput, input.editorInput, textarea.editorInput) {
+  caret-color: var(--accent);
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+:is(input.lockInput, textarea.lockInput, input.editorInput, textarea.editorInput):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--text));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+:is(input.lockInput, textarea.lockInput, input.editorInput, textarea.editorInput):not(:disabled):focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: none;
+}
+
 select.lockInput {
   cursor: pointer;
   transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
