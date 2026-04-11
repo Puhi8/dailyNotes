@@ -2,14 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_DIR="${API_DIR:-$ROOT_DIR/api}"
 FRONTEND_DIR="${FRONTEND_DIR:-$ROOT_DIR/frontend}"
 ANDROID_DIR="${ANDROID_DIR:-$FRONTEND_DIR/android}"
 
 APP="${APP:-dailynotes}"
 REPO="${REPO:-Puhi8/dailyNotes}"
 REMOTE="${GIT_REMOTE:-github}"
-DIST_DIR="${DIST_DIR:-dist}"
+DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
 USAGE="Usage: $0 v1.2.3"
+
+if [[ "$DIST_DIR" != /* ]]; then
+  DIST_DIR="$ROOT_DIR/$DIST_DIR"
+fi
 
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
@@ -302,7 +307,10 @@ build_binaries() {
     read -r goos goarch <<<"$target"
     bin="$DIST_DIR/${APP}-${goos}-${goarch}"
     echo " - $goos/$goarch"
-    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" bash -lc "$BUILD_CMD \"$bin\" \"$BUILD_PATH\""
+    (
+      cd "$API_DIR"
+      CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" bash -lc "$BUILD_CMD \"$bin\" \"$BUILD_PATH\""
+    )
   done
 }
 

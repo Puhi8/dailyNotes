@@ -2,11 +2,11 @@ FROM golang:1.24 AS builder
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
+COPY api/go.mod api/go.sum ./
 RUN go mod download
 
-COPY cmd ./cmd
-COPY internal ./internal
+COPY api/cmd ./cmd
+COPY api/internal ./internal
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

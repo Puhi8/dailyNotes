@@ -48,7 +48,8 @@ Use that password on the Login page. After login, you can change remote credenti
 Backend:
 
 ```bash
-go run ./cmd/api ./data # Listens on port 5789
+cd api
+go run ./cmd/api ../data # Listens on port 5789
 ```
 
 Frontend:
@@ -66,7 +67,8 @@ Prerequisites: Go, Node.js/npm, JDK 21+, Android SDK, and ImageMagick for Androi
 Build the API:
 
 ```bash
-go build -trimpath -ldflags='-s -w' -o dailynotes ./cmd/api
+cd api
+go build -trimpath -ldflags='-s -w' -o ../dailynotes ./cmd/api
 ```
 
 Build the Android APK:

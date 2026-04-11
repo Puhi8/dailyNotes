@@ -2,6 +2,7 @@
   "name": "package.json",
   "private": true,
   "version": "2.0.1.2",
+  "androidVersionCode": 2000102,
   "type": "module",
   "homepage": "https://Puhi8.github.io/dailyNotes",
   "scripts": {

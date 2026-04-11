@@ -15,7 +15,7 @@ SourceCode: https://github.com/Puhi8/dailyNotes
 IssueTracker: https://github.com/Puhi8/dailyNotes/issues
 
 Builds:
-  - versionName: '2.0.1.1'
+  - versionName: '2.0.1.2'
     versionCode: 2000102
     commit: v2.0.1.2
     sudo:
@@ -32,7 +32,8 @@ Builds:
       npm run android:build:fdroid
     output: frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk
 
-AutoUpdateMode: None
-UpdateCheckMode: None
+AutoUpdateMode: Version v%v
+UpdateCheckMode: HTTP
+UpdateCheckData: 'https://raw.githubusercontent.com/Puhi8/dailyNotes/main/frontend/package.json|"androidVersionCode":\s*(\d+)|.|"version":\s*"([^"]+)"'
 CurrentVersion: '2.0.1.2'
 CurrentVersionCode: 2000102

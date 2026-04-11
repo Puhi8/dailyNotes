@@ -23,15 +23,18 @@ perl -0pi -e 's/"version":\s*"[^"]+"/"version": "'"$version_name"'"/' "$PACKAGE_
 
 version_code="$("$ANDROID_VERSION_HELPER" print-code "$version_name")"
 
+if grep -q '"androidVersionCode"' "$PACKAGE_JSON"; then
+  perl -0pi -e 's/"androidVersionCode":\s*[0-9]+/"androidVersionCode": '"$version_code"'/g' "$PACKAGE_JSON"
+else
+  perl -0pi -e 's/("version":\s*"[^"]+",)/$1\n  "androidVersionCode": '"$version_code"',/' "$PACKAGE_JSON"
+fi
+
 if [[ -f "$FDROID_METADATA" ]]; then
-  export VERSION_NAME="$version_name"
-  export VERSION_CODE="$version_code"
-  export VERSION_TAG="v$version_name"
-  perl -0pi -e 's/^    versionName: .*/    versionName: '\''$ENV{VERSION_NAME}'\''/mg' "$FDROID_METADATA"
-  perl -0pi -e 's/^    versionCode: .*/    versionCode: $ENV{VERSION_CODE}/mg' "$FDROID_METADATA"
-  perl -0pi -e 's/^    commit: .*/    commit: $ENV{VERSION_TAG}/mg' "$FDROID_METADATA"
-  perl -0pi -e 's/^CurrentVersion: .*/CurrentVersion: '\''$ENV{VERSION_NAME}'\''/mg' "$FDROID_METADATA"
-  perl -0pi -e 's/^CurrentVersionCode: .*/CurrentVersionCode: $ENV{VERSION_CODE}/mg' "$FDROID_METADATA"
+  perl -0pi -e "s/^    versionName: .*/    versionName: '$version_name'/mg" "$FDROID_METADATA"
+  perl -0pi -e "s/^    versionCode: .*/    versionCode: $version_code/mg" "$FDROID_METADATA"
+  perl -0pi -e "s/^    commit: .*/    commit: v$version_name/mg" "$FDROID_METADATA"
+  perl -0pi -e "s/^CurrentVersion: .*/CurrentVersion: '$version_name'/mg" "$FDROID_METADATA"
+  perl -0pi -e "s/^CurrentVersionCode: .*/CurrentVersionCode: $version_code/mg" "$FDROID_METADATA"
 fi
 
 echo "Set frontend package version to $version_name"
