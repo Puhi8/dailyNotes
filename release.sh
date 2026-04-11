@@ -179,20 +179,25 @@ package_binaries() {
 }
 
 build_android() {
+  local android_dist_dir android_apk_name
+
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
   resolve_release_android_version
+  android_dist_dir="$(dirname "$ANDROID_APK_PATH")"
+  android_apk_name="$(basename "$ANDROID_APK_PATH")"
   echo "Using Android versionName: $ANDROID_VERSION_NAME"
   echo "Using Android versionCode: $ANDROID_VERSION_CODE"
   (
     cd "$FRONTEND_DIR"
     ANDROID_VERSION_NAME="$ANDROID_VERSION_NAME" \
       ANDROID_VERSION_CODE="$ANDROID_VERSION_CODE" \
-      ANDROID_SIGNED_APK_PATH="$ANDROID_APK_PATH" \
+      ANDROID_DIST_DIR="$android_dist_dir" \
+      ANDROID_APK_NAME="$android_apk_name" \
       npm run android:build
   )
-  echo "APK copied to:"
-  echo "  $DIST_DIR/$ANDROID_ASSET_NAME"
+  echo "APK written to:"
+  echo "  $ANDROID_APK_PATH"
 }
 
 deploy_frontend() {

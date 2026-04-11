@@ -71,16 +71,10 @@ cd api
 go build -trimpath -ldflags='-s -w' -o ../dailynotes ./cmd/api
 ```
 
-Build the Android APK:
+Build the Android APK (to the `./dist` dir):
 
 ```bash
 cd frontend
 npm install
 npm run android:build
-```
-
-The APK is written to:
-
-```text
-frontend/android/app/build/outputs/apk/release/app-release.apk
 ```
