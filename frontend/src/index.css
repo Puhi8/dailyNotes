@@ -43,47 +43,30 @@ body {
   min-height: 100vh;
 }
 
-.stateCard,
-.panelCard,
-.statsWidget,
-.chartCard {
+:is(.stateCard, .panelCard, .statsWidget, .chartCard) {
   background: var(--panel-strong);
   border: 1px solid var(--panel-edge);
   box-shadow: 0 18px 40px rgba(58, 64, 75, 0.55);
 }
 
-.stateCard > h2,
-.pageHeader h1,
-.panelTitle,
-.noteMarkdown h2,
-.noteMarkdown h3,
-.noteMarkdown h4,
-.statsWidget > h3,
-.chartHeader h2 {
+:is(.stateCard > h2, .pageHeader h1, .panelTitle, .noteMarkdown :is(h2, h3, h4), .statsWidget > h3, .chartHeader h2) {
   font-family: "Times New Roman", serif;
 }
 
-.lockInput,
-.editorInput,
-.editorTextarea,
-.calendarDay {
+:is(.lockInput, .editorInput, .calendarDay) {
   border: 1px solid var(--panel-edge);
   background: var(--panel);
   color: var(--text);
   border-radius: 10px;
 }
 
-.page,
-.home {
+:is(.page, .home) {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
 
-.panelSection,
-.editorList,
-.noteMarkdown,
-.calendarMonth {
+:is(.panelSection, .editorList, .noteMarkdown, .calendarMonth) {
   display: grid;
   gap: 10px;
 }

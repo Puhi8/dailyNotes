@@ -48,9 +48,7 @@
   color: var(--text);
 }
 
-.noteMarkdown h2,
-.noteMarkdown h3,
-.noteMarkdown h4 {
+.noteMarkdown :is(h2, h3, h4) {
   margin: 0;
 }
 
@@ -70,8 +68,7 @@
   margin: 0;
 }
 
-.noteMarkdown ul,
-.noteMarkdown ol {
+.noteMarkdown :is(ul, ol) {
   margin: 0;
   padding-left: 18px;
   display: grid;
@@ -80,6 +77,100 @@
 
 .noteMarkdown li {
   margin: 0;
+}
+
+.markdownEditor {
+  width: 100%;
+  min-height: 0;
+  padding: 18px 18px calc(18px + 3em);
+  border: 1px solid var(--panel-edge);
+  border-radius: 10px;
+  outline: none;
+  background: var(--panel);
+  color: var(--text);
+  font: 14px / 1.5 system-ui, sans-serif;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  caret-color: var(--accent);
+  tab-size: 4;
+  text-rendering: optimizeLegibility;
+  white-space: pre-wrap;
+  -webkit-font-smoothing: antialiased;
+}
+
+.markdownEditor:focus {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.markdownEditor:empty::before {
+  color: var(--muted);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.markdownEditor :is(.mdHeading1, .mdHeading2, .mdHeading3, .mdHeading4) {
+  font-weight: 700;
+}
+
+.markdownEditor .mdHeading1 {
+  font-size: 1.5em;
+}
+
+.markdownEditor .mdHeading2 {
+  font-size: 1.25em;
+}
+
+.markdownEditor .mdHeading3 {
+  font-size: 1.15em;
+}
+
+.markdownEditor .mdHeading4 {
+  font-size: 1em;
+}
+
+.markdownEditor .mdCode,
+.markdownEditor .mdCodeBlock {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.markdownEditor .mdLineGap {
+  display: inline-block;
+  width: 0;
+  height: 2.25em;
+  pointer-events: none;
+  user-select: none;
+  vertical-align: -0.75em;
+}
+
+@supports (height: 1lh) {
+  .markdownEditor .mdLineGap {
+    height: 1.5lh;
+    vertical-align: -0.5lh;
+  }
+}
+
+.markdownEditor .mdStrong {
+  font-weight: 700;
+}
+
+.markdownEditor .mdEmphasis {
+  font-style: italic;
+}
+
+.markdownEditor .mdStrike {
+  text-decoration: line-through;
+}
+
+.markdownEditor .mdUrl {
+  color: color-mix(in srgb, var(--accent) 82%, white);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.noteMarkdownEditor {
+  min-height: 0;
 }
 
 .calendarHeader {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import AutoResizeTextarea from '../components/AutoResizeTextarea'
 import ErrorState from '../components/ErrorState'
+import MarkdownEditor from '../components/MarkdownEditor'
 import { api, type DayData } from '../data/api'
 import { applyNoteTemplate, resolveNoteTemplate } from '../data/noteSettings'
 import type { IndividualDay, StatusOptions } from '../data/types'
@@ -186,11 +186,11 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
       </div>
       <div className="panelSection">
         <h2 className="panelTitle">Note (.md)</h2>
-        <AutoResizeTextarea
-          className="editorTextarea"
+        <MarkdownEditor
+          className="noteMarkdownEditor"
           value={note.main}
           placeholder={`Write ${dayType}'s markdown note.`}
-          onChange={event => handleNoteChange(event.target.value)}
+          onChange={handleNoteChange}
         />
       </div>
       <div className="editorActions">
