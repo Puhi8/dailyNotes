@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import AutoResizeTextarea from './AutoResizeTextarea'
+import MarkdownEditor from './MarkdownEditor'
 import { useAuth } from '../auth'
 import { api } from '../data/api'
 import { getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi } from '../data/noteSettings'
@@ -295,13 +295,13 @@ export default function StartupGate({ children }: { children: ReactNode }) {
           <h2>Default note</h2>
           <p>Loaded on device, then you can edit it.</p>
           <form className="lockForm" onSubmit={handleTemplateSubmit}>
-            <AutoResizeTextarea
-              className="editorTextarea startupTextarea"
+            <MarkdownEditor
+              className="noteMarkdownEditor"
               value={template.draft}
               placeholder="## Highlights"
-              onChange={event => {
+              onChange={value => {
                 templateTouchedRef.current = true
-                setTemplate({ draft: event.target.value })
+                setTemplate({ draft: value })
               }}
             />
             <div className="lockActions">

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 ANDROID_DIR="${ANDROID_DIR:-$ROOT_DIR/android}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
@@ -9,9 +10,18 @@ ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
 ANDROID_GRADLE_USER_HOME="${ANDROID_GRADLE_USER_HOME:-/tmp/dailynotes-gradle}"
 ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$ROOT_DIR/scripts/android-version.sh}"
 PREPARE_ANDROID_PROJECT="${PREPARE_ANDROID_PROJECT:-$ROOT_DIR/scripts/prepare-android-project.sh}"
+ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew --no-daemon assembleRelease}"
+ANDROID_DIST_DIR="${ANDROID_DIST_DIR:-$REPO_ROOT/dist}"
+ANDROID_APK_NAME="${ANDROID_APK_NAME:-dailynotes-android.apk}"
 
 ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
-ANDROID_SIGNED_APK_PATH="${ANDROID_SIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk}"
+if [[ "$ANDROID_DIST_DIR" != /* ]]; then
+  ANDROID_DIST_DIR="$ROOT_DIR/$ANDROID_DIST_DIR"
+fi
+ANDROID_SIGNED_APK_PATH="${ANDROID_SIGNED_APK_PATH:-$ANDROID_DIST_DIR/$ANDROID_APK_NAME}"
+if [[ "$ANDROID_SIGNED_APK_PATH" != /* ]]; then
+  ANDROID_SIGNED_APK_PATH="$ROOT_DIR/$ANDROID_SIGNED_APK_PATH"
+fi
 ANDROID_KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
 ANDROID_KEYSTORE_PASS="${ANDROID_KEYSTORE_PASS:-android}"
 ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-androiddebugkey}"
@@ -145,17 +155,19 @@ write_android_local_properties "$ANDROID_SDK_HOME"
 (
   cd "$ANDROID_DIR"
   chmod +x gradlew
-  ./gradlew --no-daemon assembleRelease
+  bash -lc "$ANDROID_BUILD_CMD"
 )
 
 [[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
 
+mkdir -p "$(dirname "$ANDROID_SIGNED_APK_PATH")"
 rm -f "$ANDROID_SIGNED_APK_PATH"
 "$apksigner" sign \
   --ks "$ANDROID_KEYSTORE_PATH" \
   --ks-key-alias "$ANDROID_KEY_ALIAS" \
   --ks-pass "pass:$ANDROID_KEYSTORE_PASS" \
   --key-pass "pass:$ANDROID_KEY_PASS" \
+  --v4-signing-enabled false \
   --out "$ANDROID_SIGNED_APK_PATH" \
   "$ANDROID_UNSIGNED_APK_PATH"
 

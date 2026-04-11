@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AutoResizeTextarea from '../components/AutoResizeTextarea'
+import MarkdownEditor from '../components/MarkdownEditor'
 import { api, type BackupConflictChoice, type BackupAccomplishmentChoice, type BackupPullPreview, type BackupSyncStatus } from '../data/api'
 import graph, { GRAPH_COMPACTNESS_MAX, GRAPH_COMPACTNESS_MIN, type GraphLineMode } from '../data/graph'
 import { getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi } from '../data/noteSettings'
@@ -507,12 +507,12 @@ export default function Settings() {
         <div className="panelSection">
           <h2 className="panelTitle">Notes</h2>
           <label className="panelLabel" htmlFor="note-template">Default note style</label>
-          <AutoResizeTextarea
+          <MarkdownEditor
             id="note-template"
-            className="editorTextarea"
+            className="noteMarkdownEditor"
             placeholder="Example: ## Highlights&#10;- item one&#10;- item two"
             value={noteTemplate}
-            onChange={event => { setNoteTemplateState(event.target.value); setStatus({ template: "idle" }) }}
+            onChange={value => { setNoteTemplateState(value); setStatus({ template: "idle" }) }}
           />
           <div className="editorActions">
             <button className="stateButton" type="button" onClick={async () => await saveTemplateValue(noteTemplate)} disabled={status.template === 'saving'}>

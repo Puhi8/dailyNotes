@@ -71,28 +71,10 @@ cd api
 go build -trimpath -ldflags='-s -w' -o ../dailynotes ./cmd/api
 ```
 
-Build the Android APK:
+Build the Android APK (to the `./dist` dir):
 
 ```bash
 cd frontend
 npm install
 npm run android:build
 ```
-
-The APK is written to:
-
-```text
-frontend/android/app/build/outputs/apk/release/app-release.apk
-```
-
-Build an unsigned F-Droid-style APK:
-
-```bash
-cd frontend
-npm install
-npm run android:build:fdroid
-```
-
-The F-Droid recipe in `.fdroid.yml` keeps `frontend/android/` generated instead of
-committed. Official F-Droid review may still ask for the generated Android
-project to be committed.
