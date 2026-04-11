@@ -5,7 +5,8 @@ processes.txt
 accomplishments.json
 dailyNotes
 package-lock.json
-android/
+/android/
+frontend/android/
 testOnServer.sh
 
 logs

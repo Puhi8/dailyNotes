@@ -5,17 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="${ANDROID_DIR:-$ROOT_DIR/android}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
-ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
 ANDROID_GRADLE_USER_HOME="${ANDROID_GRADLE_USER_HOME:-/tmp/dailynotes-gradle}"
+ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$ROOT_DIR/scripts/android-version.sh}"
 PREPARE_ANDROID_PROJECT="${PREPARE_ANDROID_PROJECT:-$ROOT_DIR/scripts/prepare-android-project.sh}"
-
-ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
-ANDROID_SIGNED_APK_PATH="${ANDROID_SIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk}"
-ANDROID_KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
-ANDROID_KEYSTORE_PASS="${ANDROID_KEYSTORE_PASS:-android}"
-ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-androiddebugkey}"
-ANDROID_KEY_PASS="${ANDROID_KEY_PASS:-android}"
 
 die() {
   echo "$*" >&2
@@ -99,43 +92,26 @@ write_android_local_properties() {
   printf 'sdk.dir=%s\n' "$escaped_sdk_home" > "$ANDROID_DIR/local.properties"
 }
 
-resolve_apksigner() {
-  local apksigner
-
-  if [[ -n "$ANDROID_APKSIGNER" ]]; then
-    [[ -x "$ANDROID_APKSIGNER" ]] || die "Android apksigner not executable: $ANDROID_APKSIGNER"
-    printf '%s\n' "$ANDROID_APKSIGNER"
-    return 0
-  fi
-
-  apksigner="$(find "$ANDROID_SDK_HOME/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort | tail -n 1)"
-  [[ -n "$apksigner" ]] || die "Could not find apksigner under $ANDROID_SDK_HOME/build-tools"
-  printf '%s\n' "$apksigner"
-}
+[[ -x "$ANDROID_VERSION_HELPER" ]] || die "Android version helper not executable: $ANDROID_VERSION_HELPER"
 
 JAVA_HOME="$(resolve_android_java_home)"
 ANDROID_SDK_HOME="$(resolve_android_sdk_home)"
+ANDROID_VERSION_NAME="$("$ANDROID_VERSION_HELPER" print-name "${ANDROID_VERSION_NAME:-}")"
+ANDROID_VERSION_CODE="${ANDROID_VERSION_CODE:-$("$ANDROID_VERSION_HELPER" print-code "$ANDROID_VERSION_NAME")}"
+
 export JAVA_HOME
 export ANDROID_HOME="$ANDROID_SDK_HOME"
 export ANDROID_SDK_ROOT="$ANDROID_SDK_HOME"
 export GRADLE_USER_HOME="$ANDROID_GRADLE_USER_HOME"
-[[ -x "$ANDROID_VERSION_HELPER" ]] || die "Android version helper not executable: $ANDROID_VERSION_HELPER"
-export ANDROID_VERSION_NAME="${ANDROID_VERSION_NAME:-$("$ANDROID_VERSION_HELPER" print-name)}"
-export ANDROID_VERSION_CODE="${ANDROID_VERSION_CODE:-$("$ANDROID_VERSION_HELPER" print-code "$ANDROID_VERSION_NAME")}"
+export ANDROID_VERSION_NAME
+export ANDROID_VERSION_CODE
 export PATH="$JAVA_HOME/bin:$ANDROID_SDK_HOME/platform-tools:$PATH"
 
 [[ -d "$ANDROID_SDK_HOME/build-tools" ]] || die "No usable Android SDK found. Set ANDROID_SDK_HOME, ANDROID_HOME, or ANDROID_SDK_ROOT."
-[[ -f "$ANDROID_KEYSTORE_PATH" ]] || die "Android keystore not found: $ANDROID_KEYSTORE_PATH"
 [[ -x "$PREPARE_ANDROID_PROJECT" ]] || die "Android prepare script not executable: $PREPARE_ANDROID_PROJECT"
 mkdir -p "$GRADLE_USER_HOME"
 
-apksigner="$(resolve_apksigner)"
-
-if [[ "$ANDROID_KEYSTORE_PATH" == "$HOME/.android/debug.keystore" && "$ANDROID_KEY_ALIAS" == "androiddebugkey" ]]; then
-  echo "Building Android APK version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE) and signing with the debug keystore for local install/testing."
-else
-  echo "Building Android APK version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE)..."
-fi
+echo "Building unsigned Android APK version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE)..."
 
 "$PREPARE_ANDROID_PROJECT"
 
@@ -148,17 +124,6 @@ write_android_local_properties "$ANDROID_SDK_HOME"
   ./gradlew --no-daemon assembleRelease
 )
 
-[[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
+[[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "Unsigned APK not found: $ANDROID_UNSIGNED_APK_PATH"
 
-rm -f "$ANDROID_SIGNED_APK_PATH"
-"$apksigner" sign \
-  --ks "$ANDROID_KEYSTORE_PATH" \
-  --ks-key-alias "$ANDROID_KEY_ALIAS" \
-  --ks-pass "pass:$ANDROID_KEYSTORE_PASS" \
-  --key-pass "pass:$ANDROID_KEY_PASS" \
-  --out "$ANDROID_SIGNED_APK_PATH" \
-  "$ANDROID_UNSIGNED_APK_PATH"
-
-"$apksigner" verify "$ANDROID_SIGNED_APK_PATH" >/dev/null || die "Signed APK verification failed"
-
-echo "Built installable APK: $ANDROID_SIGNED_APK_PATH"
+echo "Built unsigned APK for F-Droid: $ANDROID_UNSIGNED_APK_PATH"
