@@ -3,10 +3,16 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_ICON="${ROOT_DIR}/public/icon.png"
+SOURCE_MONOCHROME_ICON="${ROOT_DIR}/public/icon-monochrome.xml"
 RES_DIR="${ROOT_DIR}/android/app/src/main/res"
 
 if [[ ! -f "$SOURCE_ICON" ]]; then
   echo "Source icon not found: $SOURCE_ICON" >&2
+  exit 1
+fi
+
+if [[ ! -f "$SOURCE_MONOCHROME_ICON" ]]; then
+  echo "Source monochrome icon not found: $SOURCE_MONOCHROME_ICON" >&2
   exit 1
 fi
 
@@ -52,34 +58,45 @@ render_round_icon() {
     "PNG32:${output}"
 }
 
-render_foreground_icon() {
-  local canvas_size="$1"
-  local output="$2"
-  local inner_size=$((canvas_size * 2 / 3))
+write_vector_icons() {
+  local drawable_dir="${RES_DIR}/drawable"
+  mkdir -p "$drawable_dir"
+  cp "$SOURCE_MONOCHROME_ICON" "${drawable_dir}/ic_launcher_foreground_vector.xml"
+  cp "$SOURCE_MONOCHROME_ICON" "${drawable_dir}/ic_launcher_monochrome.xml"
+}
 
-  "${IMAGE_TOOL[@]}" "$SOURCE_ICON" \
-    -resize "${inner_size}x${inner_size}" \
-    -background none \
-    -gravity center \
-    -extent "${canvas_size}x${canvas_size}" \
-    "PNG32:${output}"
+write_adaptive_icon() {
+  local output="$1"
+  mkdir -p "$(dirname "$output")"
+  cat > "$output" <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground_vector" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
+EOF
 }
 
 declare -a launcher_sizes=(
-  "mipmap-mdpi 48 108"
-  "mipmap-hdpi 72 162"
-  "mipmap-xhdpi 96 216"
-  "mipmap-xxhdpi 144 324"
-  "mipmap-xxxhdpi 192 432"
+  "mipmap-mdpi 48"
+  "mipmap-hdpi 72"
+  "mipmap-xhdpi 96"
+  "mipmap-xxhdpi 144"
+  "mipmap-xxxhdpi 192"
 )
 
 for spec in "${launcher_sizes[@]}"; do
-  read -r density icon_size foreground_size <<<"$spec"
+  read -r density icon_size <<<"$spec"
   density_dir="${RES_DIR}/${density}"
 
   render_square_icon "$icon_size" "${density_dir}/ic_launcher.png"
   render_round_icon "$icon_size" "${density_dir}/ic_launcher_round.png"
-  render_foreground_icon "$foreground_size" "${density_dir}/ic_launcher_foreground.png"
+  rm -f "${density_dir}/ic_launcher_foreground.png"
 done
+
+write_vector_icons
+write_adaptive_icon "${RES_DIR}/mipmap-anydpi-v26/ic_launcher.xml"
+write_adaptive_icon "${RES_DIR}/mipmap-anydpi-v26/ic_launcher_round.xml"
 
 echo "Synced Android launcher icons from ${SOURCE_ICON}"

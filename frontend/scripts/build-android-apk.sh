@@ -9,6 +9,7 @@ ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
 ANDROID_GRADLE_USER_HOME="${ANDROID_GRADLE_USER_HOME:-/tmp/dailynotes-gradle}"
 ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$ROOT_DIR/scripts/android-version.sh}"
 PREPARE_ANDROID_PROJECT="${PREPARE_ANDROID_PROJECT:-$ROOT_DIR/scripts/prepare-android-project.sh}"
+ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew --no-daemon assembleRelease}"
 
 ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_SIGNED_APK_PATH="${ANDROID_SIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk}"
@@ -145,7 +146,7 @@ write_android_local_properties "$ANDROID_SDK_HOME"
 (
   cd "$ANDROID_DIR"
   chmod +x gradlew
-  ./gradlew --no-daemon assembleRelease
+  bash -lc "$ANDROID_BUILD_CMD"
 )
 
 [[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
@@ -156,6 +157,7 @@ rm -f "$ANDROID_SIGNED_APK_PATH"
   --ks-key-alias "$ANDROID_KEY_ALIAS" \
   --ks-pass "pass:$ANDROID_KEYSTORE_PASS" \
   --key-pass "pass:$ANDROID_KEY_PASS" \
+  --v4-signing-enabled false \
   --out "$ANDROID_SIGNED_APK_PATH" \
   "$ANDROID_UNSIGNED_APK_PATH"
 

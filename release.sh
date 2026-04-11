@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_DIR="${API_DIR:-$ROOT_DIR/api}"
 FRONTEND_DIR="${FRONTEND_DIR:-$ROOT_DIR/frontend}"
-ANDROID_DIR="${ANDROID_DIR:-$FRONTEND_DIR/android}"
 
 APP="${APP:-dailynotes}"
 REPO="${REPO:-Puhi8/dailyNotes}"
@@ -33,19 +32,9 @@ DOCKER_IMAGE="${DOCKER_IMAGE:-ghcr.io/puhi8/dailynotes}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 FRONTEND_DEPLOY_CMD="${FRONTEND_DEPLOY_CMD:-npm run deploy}"
 
-ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew --no-daemon assembleRelease}"
 ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-android.apk}"
-ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_APK_PATH="${ANDROID_APK_PATH:-$DIST_DIR/$ANDROID_ASSET_NAME}"
-ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
-ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
-ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
-ANDROID_GRADLE_USER_HOME="${ANDROID_GRADLE_USER_HOME:-/tmp/dailynotes-gradle}"
 ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$FRONTEND_DIR/scripts/android-version.sh}"
-ANDROID_KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
-ANDROID_KEYSTORE_PASS="${ANDROID_KEYSTORE_PASS:-android}"
-ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-androiddebugkey}"
-ANDROID_KEY_PASS="${ANDROID_KEY_PASS:-android}"
 
 GHCR_USERNAME="${GHCR_USERNAME:-${GITHUB_ACTOR:-}}"
 GHCR_TOKEN="${GHCR_TOKEN:-${CR_PAT:-${GITHUB_TOKEN:-}}}"
@@ -130,102 +119,6 @@ collect_release_assets() {
   [[ ${#RELEASE_ASSETS[@]} -gt 0 ]] || die "No release assets found in $DIST_DIR"
 }
 
-ensure_android_project() {
-  [[ -d "$ANDROID_DIR" ]] && return 0
-  echo "Android project not found at $ANDROID_DIR; running npx cap add android..."
-  run_cmd_in_dir "$FRONTEND_DIR" "npx cap add android"
-}
-
-java_major_version() {
-  local java_home="$1"
-  local version
-
-  version="$("$java_home/bin/javac" -version 2>&1 | awk '/^javac / { print $2; exit }')"
-  version="${version%\"}"
-  version="${version#\"}"
-
-  if [[ "$version" =~ ^1\.([0-9]+) ]] || [[ "$version" =~ ^([0-9]+) ]]; then
-    printf '%s\n' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  return 1
-}
-
-resolve_android_java_home() {
-  local candidate major
-  local -a candidates=()
-
-  [[ -n "$ANDROID_JAVA_HOME" ]] && candidates+=("$ANDROID_JAVA_HOME")
-  [[ -n "${JAVA_HOME:-}" ]] && candidates+=("$JAVA_HOME")
-  candidates+=("$HOME/.android-studio/jbr")
-
-  shopt -s nullglob
-  for candidate in /usr/lib/jvm/*; do
-    candidates+=("$candidate")
-  done
-  shopt -u nullglob
-
-  for candidate in "${candidates[@]}"; do
-    [[ -x "$candidate/bin/java" && -x "$candidate/bin/javac" ]] || continue
-    major="$(java_major_version "$candidate")" || continue
-    (( major >= 21 )) && {
-      printf '%s\n' "$candidate"
-      return 0
-    }
-  done
-  die "No usable JDK 21+ found. Set ANDROID_JAVA_HOME or JAVA_HOME."
-}
-
-resolve_android_sdk_home() {
-  local candidate
-  local -a candidates=()
-
-  [[ -n "$ANDROID_SDK_HOME" ]] && candidates+=("$ANDROID_SDK_HOME")
-  [[ -n "${ANDROID_HOME:-}" ]] && candidates+=("$ANDROID_HOME")
-  [[ -n "${ANDROID_SDK_ROOT:-}" ]] && candidates+=("$ANDROID_SDK_ROOT")
-
-  candidates+=(
-    "$HOME/Android/Sdk"
-    "$HOME/Android/sdk"
-    "$HOME/Library/Android/sdk"
-    "$HOME/AppData/Local/Android/Sdk"
-    "$HOME/.android/sdk"
-  )
-
-  for candidate in "${candidates[@]}"; do
-    [[ -d "$candidate/platforms" && -d "$candidate/build-tools" ]] && {
-      printf '%s\n' "$candidate"
-      return 0
-    }
-  done
-
-  die "No usable Android SDK found. Set ANDROID_SDK_HOME, ANDROID_HOME, or ANDROID_SDK_ROOT."
-}
-
-resolve_apksigner() {
-  local sdk_home="$1"
-  local apksigner
-
-  if [[ -n "$ANDROID_APKSIGNER" ]]; then
-    [[ -x "$ANDROID_APKSIGNER" ]] || die "Android apksigner not executable: $ANDROID_APKSIGNER"
-    printf '%s\n' "$ANDROID_APKSIGNER"
-    return 0
-  fi
-
-  apksigner="$(find "$sdk_home/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort | tail -n 1)"
-  [[ -n "$apksigner" ]] || die "Could not find apksigner under $sdk_home/build-tools"
-  printf '%s\n' "$apksigner"
-}
-
-write_android_local_properties() {
-  local sdk_home="$1"
-  local escaped_sdk_home
-
-  escaped_sdk_home="${sdk_home//\\/\\\\}"
-  escaped_sdk_home="${escaped_sdk_home//:/\\:}"
-  printf 'sdk.dir=%s\n' "$escaped_sdk_home" > "$ANDROID_DIR/local.properties"
-}
-
 resolve_release_android_version() {
   [[ -x "$ANDROID_VERSION_HELPER" ]] || die "Android version helper not executable: $ANDROID_VERSION_HELPER"
 
@@ -233,49 +126,6 @@ resolve_release_android_version() {
   ANDROID_VERSION_CODE="${ANDROID_VERSION_CODE:-$("$ANDROID_VERSION_HELPER" print-code "$ANDROID_VERSION_NAME")}"
   export ANDROID_VERSION_NAME
   export ANDROID_VERSION_CODE
-}
-
-run_android_cmd() {
-  local java_home="$1"
-  local sdk_home="$2"
-  local dir="$3"
-  local cmd="$4"
-
-  (
-    export JAVA_HOME="$java_home"
-    export ANDROID_HOME="$sdk_home"
-    export ANDROID_SDK_ROOT="$sdk_home"
-    export GRADLE_USER_HOME="$ANDROID_GRADLE_USER_HOME"
-    export PATH="$java_home/bin:$sdk_home/platform-tools:$PATH"
-    mkdir -p "$GRADLE_USER_HOME"
-    cd "$dir"
-    bash -lc "$cmd"
-  )
-}
-
-sign_android_apk() {
-  local sdk_home="$1"
-  local apksigner
-
-  apksigner="$(resolve_apksigner "$sdk_home")"
-  [[ -f "$ANDROID_KEYSTORE_PATH" ]] || die "Android keystore not found: $ANDROID_KEYSTORE_PATH"
-
-  if [[ "$ANDROID_KEYSTORE_PATH" == "$HOME/.android/debug.keystore" && "$ANDROID_KEY_ALIAS" == "androiddebugkey" ]]; then
-    echo "Signing Android APK with debug keystore..."
-  else
-    echo "Signing Android APK with keystore: $ANDROID_KEYSTORE_PATH"
-  fi
-
-  rm -f "$ANDROID_APK_PATH"
-  "$apksigner" sign \
-    --ks "$ANDROID_KEYSTORE_PATH" \
-    --ks-key-alias "$ANDROID_KEY_ALIAS" \
-    --ks-pass "pass:$ANDROID_KEYSTORE_PASS" \
-    --key-pass "pass:$ANDROID_KEY_PASS" \
-    --out "$ANDROID_APK_PATH" \
-    "$ANDROID_UNSIGNED_APK_PATH"
-
-  "$apksigner" verify "$ANDROID_APK_PATH" >/dev/null || die "Signed APK verification failed"
 }
 
 login_docker_registry() {
@@ -325,32 +175,22 @@ package_binaries() {
       tar -czf "${base}.tar.gz" "$base"
       rm -f "$base"
     done
-    if command -v sha256sum >/dev/null 2>&1; then
-      sha256sum ./* > checksums.txt
-    else
-      shasum -a 256 ./* > checksums.txt
-    fi
   )
 }
 
 build_android() {
-  local java_home sdk_home
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
-  ensure_android_project
   resolve_release_android_version
-  java_home="$(resolve_android_java_home)"
-  sdk_home="$(resolve_android_sdk_home)"
-  write_android_local_properties "$sdk_home"
-  echo "Using Android JDK: $java_home"
-  echo "Using Android SDK: $sdk_home"
   echo "Using Android versionName: $ANDROID_VERSION_NAME"
   echo "Using Android versionCode: $ANDROID_VERSION_CODE"
-  run_android_cmd "$java_home" "$sdk_home" "$FRONTEND_DIR" "npm run android:sync"
-  [[ -f "$ANDROID_DIR/gradlew" ]] || die "No Gradle wrapper found at $ANDROID_DIR/gradlew"
-  run_android_cmd "$java_home" "$sdk_home" "$ANDROID_DIR" "chmod +x gradlew && $ANDROID_BUILD_CMD"
-  [[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
-  sign_android_apk "$sdk_home"
+  (
+    cd "$FRONTEND_DIR"
+    ANDROID_VERSION_NAME="$ANDROID_VERSION_NAME" \
+      ANDROID_VERSION_CODE="$ANDROID_VERSION_CODE" \
+      ANDROID_SIGNED_APK_PATH="$ANDROID_APK_PATH" \
+      npm run android:build
+  )
   echo "APK copied to:"
   echo "  $DIST_DIR/$ANDROID_ASSET_NAME"
 }
