@@ -117,16 +117,16 @@
   cursor: pointer;
 }
 
-.calendarDayHasNote {
+.calendarDay.calendarDayHasNote {
   border-color: var(--accent-border);
   background: var(--accent-surface);
 }
 
-.calendarDayEmptyNote {
+.calendarDay.calendarDayEmptyNote {
   color: var(--muted);
 }
 
-.calendarDayInactive {
+.calendarDay.calendarDayInactive {
   opacity: 0.35;
   cursor: default;
 }

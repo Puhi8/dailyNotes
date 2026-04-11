@@ -1,0 +1,39 @@
+Categories:
+  - Note
+  - Writing
+License: MIT
+Name: Daily Notes
+Summary: Offline-first daily notes with optional self-hosted backup
+Description: |-
+  Daily Notes is an offline-first notes and personal tracking app.
+
+  Data is stored locally on the device. A self-hosted backup API can be
+  configured, but the app works without a remote server.
+RepoType: git
+Repo: https://github.com/Puhi8/dailyNotes.git
+SourceCode: https://github.com/Puhi8/dailyNotes
+IssueTracker: https://github.com/Puhi8/dailyNotes/issues
+
+Builds:
+  - versionName: '2.0.1.2'
+    versionCode: 2000102
+    commit: v2.0.1.2
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-21-jdk-headless nodejs npm imagemagick
+      - update-alternatives --auto java
+    prebuild: |-
+      cd frontend
+      npm install --ignore-scripts --no-audit --no-fund
+    build: |-
+      export ANDROID_VERSION_NAME=$$VERSION$$
+      export ANDROID_VERSION_CODE=$$VERCODE$$
+      cd frontend
+      npm run android:build:fdroid
+    output: frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: HTTP
+UpdateCheckData: 'https://raw.githubusercontent.com/Puhi8/dailyNotes/main/frontend/package.json|"androidVersionCode":\s*(\d+)|.|"version":\s*"([^"]+)"'
+CurrentVersion: '2.0.1.2'
+CurrentVersionCode: 2000102

@@ -2,14 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_DIR="${API_DIR:-$ROOT_DIR/api}"
 FRONTEND_DIR="${FRONTEND_DIR:-$ROOT_DIR/frontend}"
 ANDROID_DIR="${ANDROID_DIR:-$FRONTEND_DIR/android}"
 
 APP="${APP:-dailynotes}"
 REPO="${REPO:-Puhi8/dailyNotes}"
 REMOTE="${GIT_REMOTE:-github}"
-DIST_DIR="${DIST_DIR:-dist}"
+DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
 USAGE="Usage: $0 v1.2.3"
+
+if [[ "$DIST_DIR" != /* ]]; then
+  DIST_DIR="$ROOT_DIR/$DIST_DIR"
+fi
 
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
@@ -28,13 +33,15 @@ DOCKER_IMAGE="${DOCKER_IMAGE:-ghcr.io/puhi8/dailynotes}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 FRONTEND_DEPLOY_CMD="${FRONTEND_DEPLOY_CMD:-npm run deploy}"
 
-ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew assembleRelease}"
+ANDROID_BUILD_CMD="${ANDROID_BUILD_CMD:-./gradlew --no-daemon assembleRelease}"
 ANDROID_ASSET_NAME="${ANDROID_ASSET_NAME:-${APP}-android.apk}"
 ANDROID_UNSIGNED_APK_PATH="${ANDROID_UNSIGNED_APK_PATH:-$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk}"
 ANDROID_APK_PATH="${ANDROID_APK_PATH:-$DIST_DIR/$ANDROID_ASSET_NAME}"
 ANDROID_JAVA_HOME="${ANDROID_JAVA_HOME:-}"
 ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-}"
 ANDROID_APKSIGNER="${ANDROID_APKSIGNER:-}"
+ANDROID_GRADLE_USER_HOME="${ANDROID_GRADLE_USER_HOME:-/tmp/dailynotes-gradle}"
+ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$FRONTEND_DIR/scripts/android-version.sh}"
 ANDROID_KEYSTORE_PATH="${ANDROID_KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
 ANDROID_KEYSTORE_PASS="${ANDROID_KEYSTORE_PASS:-android}"
 ANDROID_KEY_ALIAS="${ANDROID_KEY_ALIAS:-androiddebugkey}"
@@ -219,6 +226,15 @@ write_android_local_properties() {
   printf 'sdk.dir=%s\n' "$escaped_sdk_home" > "$ANDROID_DIR/local.properties"
 }
 
+resolve_release_android_version() {
+  [[ -x "$ANDROID_VERSION_HELPER" ]] || die "Android version helper not executable: $ANDROID_VERSION_HELPER"
+
+  ANDROID_VERSION_NAME="$("$ANDROID_VERSION_HELPER" print-name "$VERSION")"
+  ANDROID_VERSION_CODE="${ANDROID_VERSION_CODE:-$("$ANDROID_VERSION_HELPER" print-code "$ANDROID_VERSION_NAME")}"
+  export ANDROID_VERSION_NAME
+  export ANDROID_VERSION_CODE
+}
+
 run_android_cmd() {
   local java_home="$1"
   local sdk_home="$2"
@@ -229,7 +245,9 @@ run_android_cmd() {
     export JAVA_HOME="$java_home"
     export ANDROID_HOME="$sdk_home"
     export ANDROID_SDK_ROOT="$sdk_home"
+    export GRADLE_USER_HOME="$ANDROID_GRADLE_USER_HOME"
     export PATH="$java_home/bin:$sdk_home/platform-tools:$PATH"
+    mkdir -p "$GRADLE_USER_HOME"
     cd "$dir"
     bash -lc "$cmd"
   )
@@ -289,7 +307,10 @@ build_binaries() {
     read -r goos goarch <<<"$target"
     bin="$DIST_DIR/${APP}-${goos}-${goarch}"
     echo " - $goos/$goarch"
-    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" bash -lc "$BUILD_CMD \"$bin\" \"$BUILD_PATH\""
+    (
+      cd "$API_DIR"
+      CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" bash -lc "$BUILD_CMD \"$bin\" \"$BUILD_PATH\""
+    )
   done
 }
 
@@ -317,11 +338,14 @@ build_android() {
   echo "Building Android APK..."
   mkdir -p "$DIST_DIR"
   ensure_android_project
+  resolve_release_android_version
   java_home="$(resolve_android_java_home)"
   sdk_home="$(resolve_android_sdk_home)"
   write_android_local_properties "$sdk_home"
   echo "Using Android JDK: $java_home"
   echo "Using Android SDK: $sdk_home"
+  echo "Using Android versionName: $ANDROID_VERSION_NAME"
+  echo "Using Android versionCode: $ANDROID_VERSION_CODE"
   run_android_cmd "$java_home" "$sdk_home" "$FRONTEND_DIR" "npm run android:sync"
   [[ -f "$ANDROID_DIR/gradlew" ]] || die "No Gradle wrapper found at $ANDROID_DIR/gradlew"
   run_android_cmd "$java_home" "$sdk_home" "$ANDROID_DIR" "chmod +x gradlew && $ANDROID_BUILD_CMD"

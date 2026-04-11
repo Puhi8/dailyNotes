@@ -48,7 +48,8 @@ Use that password on the Login page. After login, you can change remote credenti
 Backend:
 
 ```bash
-go run ./cmd/api ./data # Listens on port 5789
+cd api
+go run ./cmd/api ../data # Listens on port 5789
 ```
 
 Frontend:
@@ -58,3 +59,40 @@ cd frontend
 npm install
 npm run dev # Listens on port 9998
 ```
+
+## Build It Yourself
+
+Prerequisites: Go, Node.js/npm, JDK 21+, Android SDK, and ImageMagick for Android launcher icon generation.
+
+Build the API:
+
+```bash
+cd api
+go build -trimpath -ldflags='-s -w' -o ../dailynotes ./cmd/api
+```
+
+Build the Android APK:
+
+```bash
+cd frontend
+npm install
+npm run android:build
+```
+
+The APK is written to:
+
+```text
+frontend/android/app/build/outputs/apk/release/app-release.apk
+```
+
+Build an unsigned F-Droid-style APK:
+
+```bash
+cd frontend
+npm install
+npm run android:build:fdroid
+```
+
+The F-Droid recipe in `.fdroid.yml` keeps `frontend/android/` generated instead of
+committed. Official F-Droid review may still ask for the generated Android
+project to be committed.
