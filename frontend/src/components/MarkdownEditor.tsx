@@ -35,11 +35,11 @@ const appendVisibleText = (parent: Node, text: string) => {
   parts.forEach((part, index) => {
     if (part) parent.appendChild(document.createTextNode(part))
     if (index === parts.length - 1) return
+    parent.appendChild(document.createTextNode('\n'))
     const gap = document.createElement('span')
     gap.className = 'mdLineGap'
     gap.setAttribute('aria-hidden', 'true')
     parent.appendChild(gap)
-    parent.appendChild(document.createTextNode('\n'))
   })
 }
 
@@ -125,32 +125,35 @@ const restoreCursor = (root: HTMLElement, cursor: Cursor) => {
 
 const highlight = (root: HTMLElement, keepCursor: boolean) => {
   const cursor = keepCursor ? saveCursor(root) : null
+  const topBefore = keepCursor ? root.getBoundingClientRect().top : null
   const text = root.textContent ?? ''
   root.replaceChildren(markdownFragment(text))
   root.normalize()
   if (cursor) restoreCursor(root, cursor)
+  if (topBefore != null) {
+    const topAfter = root.getBoundingClientRect().top
+    window.scrollBy(0, topAfter - topBefore)
+  }
 }
 
 export default function MarkdownEditor(props: MarkdownEditorProps) {
   const { className, onChange, placeholder, value, ...rest } = props
   const editorRef = useRef<HTMLDivElement | null>(null)
-  const highlightTimerRef = useRef<number | null>(null)
-
+  const highlightFrameRef = useRef<number | null>(null)
   const scheduleHighlight = (editor: HTMLElement) => {
-    if (highlightTimerRef.current != null) window.clearTimeout(highlightTimerRef.current)
-    highlightTimerRef.current = window.setTimeout(() => {
-      highlightTimerRef.current = null
+    if (highlightFrameRef.current != null) window.cancelAnimationFrame(highlightFrameRef.current)
+    highlightFrameRef.current = window.requestAnimationFrame(() => {
+      highlightFrameRef.current = null
       highlight(editor, document.activeElement === editor)
-    }, 40)
+    })
   }
 
   useLayoutEffect(() => {
     const editor = editorRef.current
-    if (!editor) return
-    if (editor.textContent === value) return
-    if (highlightTimerRef.current != null) {
-      window.clearTimeout(highlightTimerRef.current)
-      highlightTimerRef.current = null
+    if (!editor || editor.textContent === value) return
+    if (highlightFrameRef.current != null) {
+      window.cancelAnimationFrame(highlightFrameRef.current)
+      highlightFrameRef.current = null
     }
     editor.textContent = value
     highlight(editor, false)
@@ -158,7 +161,7 @@ export default function MarkdownEditor(props: MarkdownEditorProps) {
 
   useLayoutEffect(() => {
     return () => {
-      if (highlightTimerRef.current != null) window.clearTimeout(highlightTimerRef.current)
+      if (highlightFrameRef.current != null) window.cancelAnimationFrame(highlightFrameRef.current)
     }
   }, [])
 
@@ -179,9 +182,9 @@ export default function MarkdownEditor(props: MarkdownEditorProps) {
     }}
     onBlur={event => {
       rest.onBlur?.(event)
-      if (highlightTimerRef.current != null) {
-        window.clearTimeout(highlightTimerRef.current)
-        highlightTimerRef.current = null
+      if (highlightFrameRef.current != null) {
+        window.cancelAnimationFrame(highlightFrameRef.current)
+        highlightFrameRef.current = null
       }
       highlight(event.currentTarget, false)
     }}

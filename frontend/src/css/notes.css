@@ -110,23 +110,10 @@
 }
 
 .markdownEditor :is(.mdHeading1, .mdHeading2, .mdHeading3, .mdHeading4) {
-  font-weight: 700;
-}
-
-.markdownEditor .mdHeading1 {
-  font-size: 1.5em;
-}
-
-.markdownEditor .mdHeading2 {
-  font-size: 1.25em;
-}
-
-.markdownEditor .mdHeading3 {
-  font-size: 1.15em;
-}
-
-.markdownEditor .mdHeading4 {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
   font-size: 1em;
+  font-weight: 600;
+  line-height: inherit;
 }
 
 .markdownEditor .mdCode,
@@ -140,13 +127,12 @@
   height: 2.25em;
   pointer-events: none;
   user-select: none;
-  vertical-align: -0.75em;
+  vertical-align: 0.2em;
 }
 
 @supports (height: 1lh) {
   .markdownEditor .mdLineGap {
-    height: 1.5lh;
-    vertical-align: -0.5lh;
+    height: 1lh;
   }
 }
 
