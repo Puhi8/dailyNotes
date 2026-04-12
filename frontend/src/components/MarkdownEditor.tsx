@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef, type ComponentPropsWithoutRef } from 'react'
+import { getNoteHeaderColors } from '../data/noteSettings'
 
 type MarkdownEditorProps = Omit<ComponentPropsWithoutRef<'div'>, 'children' | 'contentEditable' | 'onChange'> & {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  colorHeadings?: boolean
 }
 
 type Cursor = { start: number; end: number }
@@ -137,7 +139,7 @@ const highlight = (root: HTMLElement, keepCursor: boolean) => {
 }
 
 export default function MarkdownEditor(props: MarkdownEditorProps) {
-  const { className, onChange, placeholder, value, ...rest } = props
+  const { className, colorHeadings = getNoteHeaderColors(), onChange, placeholder, value, ...rest } = props
   const editorRef = useRef<HTMLDivElement | null>(null)
   const highlightFrameRef = useRef<number | null>(null)
   const scheduleHighlight = (editor: HTMLElement) => {
@@ -168,7 +170,7 @@ export default function MarkdownEditor(props: MarkdownEditorProps) {
   return <div
     {...rest}
     ref={editorRef}
-    className={['markdownEditor', className].filter(Boolean).join(' ')}
+    className={['markdownEditor', colorHeadings ? 'markdownEditorColorHeadings' : null, className].filter(Boolean).join(' ')}
     contentEditable="plaintext-only"
     data-placeholder={placeholder}
     role="textbox"

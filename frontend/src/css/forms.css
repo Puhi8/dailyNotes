@@ -57,13 +57,13 @@
 }
 
 :is(input.lockInput, textarea.lockInput, input.editorInput, textarea.editorInput):not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--accent) 68%, var(--text));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--panel-edge));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 :is(input.lockInput, textarea.lockInput, input.editorInput, textarea.editorInput):not(:disabled):focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--panel-edge));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
   outline: none;
 }
 
@@ -73,15 +73,15 @@ select.lockInput {
 }
 
 select.lockInput:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--accent) 68%, var(--text));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--panel-edge));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 select.lockInput:not(:disabled):active,
 select.lockInput:not(:disabled):focus {
-  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--panel-edge));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
   outline: none;
 }
 
