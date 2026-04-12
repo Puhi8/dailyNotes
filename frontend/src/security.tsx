@@ -4,6 +4,7 @@ import { NativeBiometric } from '@capgo/capacitor-native-biometric'
 import { Capacitor } from '@capacitor/core'
 import { manageLocalStorage } from './utils/localProcessing'
 import { useObjectState } from './utils/functions'
+import { Button, LockInput } from './utils/simplifyReact'
 
 type UnlockScope = 'home' | 'app'
 
@@ -260,33 +261,26 @@ export function RequireReauth({
       {!hasPin
         ? <div className="stateMeta">PIN not configured.</div>
         : <form className="lockForm" onSubmit={handleSubmit}>
-          <input
+          <LockInput.pin
             ref={pinInputRef}
-            className="lockInput"
-            type="password"
             placeholder="PIN"
             value={pin}
             onChange={event => setPin(event.target.value)}
             onFocus={handlePinFocus}
-            inputMode="numeric"
             autoComplete="one-time-code"
           />
           <div className="lockActions">
-            <button className="stateButton" type="submit">Unlock</button>
-            {biometricAvailable && biometricEnabled && <button
-              className="stateButton stateButtonSecondary"
-              type="button"
-              onClick={handleBiometric}
-            >
+            <Button.primary type="submit">Unlock</Button.primary>
+            {biometricAvailable && biometricEnabled && <Button.secondary onClick={handleBiometric}>
               Use fingerprint
-            </button>
+            </Button.secondary>
             }
-            <button className="stateButton stateButtonSecondary" type="button" onClick={() => navigate('/')}>Go back</button>
+            <Button.secondary onClick={() => navigate("/")}>Go back</Button.secondary>
           </div>
         </form>
       }
       {!hasPin && <div className="lockActions">
-        <button className="stateButton stateButtonSecondary" type="button" onClick={() => navigate('/')}>Go back</button>
+        <Button.secondary onClick={() => navigate("/")}>Go back</Button.secondary>
       </div>}
       {error && <div className="stateMeta stateMetaError">{error}</div>}
     </div>

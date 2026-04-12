@@ -26,15 +26,11 @@ export default function App() {
       {shouldUseHashRouter
         ? <HashRouter>
           <AndroidBackButtonBridge />
-          <StartupGate>
-            <AppShell />
-          </StartupGate>
+          <StartupGate><AppShell /></StartupGate>
         </HashRouter>
         : <BrowserRouter basename={routerBasename}>
           <AndroidBackButtonBridge />
-          <StartupGate>
-            <AppShell />
-          </StartupGate>
+          <StartupGate><AppShell /></StartupGate>
         </BrowserRouter>}
     </SecurityProvider>
   </AuthProvider>
@@ -85,9 +81,7 @@ function AppShell() {
         <Route path="/login" element={<Login />} />
         <Route
           path="/"
-          element={<RequireAuth>
-            <HomeGate />
-          </RequireAuth>}
+          element={<RequireAuth><HomeGate /></RequireAuth>}
         />
         {lockedRouts.map(item => (
           <Route

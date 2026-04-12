@@ -30,13 +30,8 @@ export default function NoteMarkdown({ text }: NoteMarkdownProps) {
       const match = line.match(/^(#{1,3})\s+/)
       const level = match ? match[1].length : 1
       const content = stripHeading(line)
-      if (content !== '') blocks.push(
-        level === 1
-          ? <h2 key={`h-${index}`}>{content}</h2>
-          : level === 2
-            ? <h3 key={`h-${index}`}>{content}</h3>
-            : <h4 key={`h-${index}`}>{content}</h4>
-      )
+      const Tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
+      if (content !== '') blocks.push(<Tag key={`h-${index}`}>{content}</Tag>)
       index += 1
       continue
     }

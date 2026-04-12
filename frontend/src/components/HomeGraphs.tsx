@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type ReactNode, type SetStateAction } from 'react'
 import type { DayEntry, ServerData } from '../data/types'
 import graph, { type ChartPoint } from '../data/graph'
 import { LineChart, XAxis, YAxis, Line, ResponsiveContainer, CartesianGrid, Tooltip } from 'recharts'
@@ -183,67 +183,16 @@ function Heatmap({ range, dataByDate }: { range: { start: string, end: string },
 
   if (!(weeks && weeks.length > 0)) return <div className="heatmapEmpty">No heatmap data</div>
 
-  const todayKey = dayKey.today()
-  const combinedMonthLabels: string[] = []
-  let lastMonthLabel = ''
-  weeks.forEach(week => {
-    const anchor = week.find(date => Boolean(dataByDate[date])) ?? week[0]
-    if (!anchor) {
-      combinedMonthLabels.push('')
-      return
-    }
-    const parts = anchor.split('-')
-    const month = parts.length === 3 ? Number.parseInt(parts[1], 10) : Number.NaN
-    if (!Number.isFinite(month)) {
-      combinedMonthLabels.push('')
-      return
-    }
-    const label = months.short[month - 1] ?? ''
-    if (label && label !== lastMonthLabel) {
-      combinedMonthLabels.push(label)
-      lastMonthLabel = label
-    }
-    else combinedMonthLabels.push('')
-  })
+  const renderContext = { dataByDate, todayKey: dayKey.today(), setTooltip, useMultiColor }
   const tooltipEntries = tooltip ? Object.entries(dataByDate[tooltip.date]?.data ?? {}) : []
-  const orderedBlocks = splitByMonth ? [...monthBlocks].reverse() : monthBlocks
+  const combinedColumns = splitByMonth ? null : buildCombinedHeatmapColumns(weeks, renderContext)
   return <div className="heatmapWrapper" ref={wrapperRef} onMouseLeave={() => setTooltip(null)}>
     <div className="heatmapMonthGrid">
       {splitByMonth
-        ? orderedBlocks.map((block, blockIndex) => (
-          <div className="heatmapMonthBlock" key={`month-${blockIndex}-${block.label}`}>
-            <div className="heatmapMonths">
-              {block.weeks.map((_, labelIndex) => (
-                <div className="heatmapMonth" key={`month-${blockIndex}-${labelIndex}`}>
-                  {labelIndex === 0 ? block.label : ''}
-                </div>
-              ))}
-            </div>
-            <div className="heatmap">
-              {block.weeks.map((week, weekIndex) => (
-                <div className="heatmapWeek" key={`week-${blockIndex}-${weekIndex}`}>
-                  {week.map((date, dayIndex) => {
-                    if (!date) return <div key={`empty-${weekIndex}-${dayIndex}`} className="heatmapSpacer" />
-                    return makeHeatmapWeek(dataByDate, date, todayKey, setTooltip, useMultiColor)
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))
+        ? [...monthBlocks].reverse().map((block, blockIndex) => renderHeatmapMonthBlock(block, blockIndex, renderContext))
         : <div className="heatmapMonthBlock">
-          <div className="heatmapMonths">
-            {combinedMonthLabels.map((label, labelIndex) => (
-              <div className="heatmapMonth" key={`month-combined-${labelIndex}`}>{label}</div>
-            ))}
-          </div>
-          <div className="heatmap">
-            {weeks.map((week, weekIndex) => (
-              <div className="heatmapWeek" key={`week-combined-${weekIndex}`}>
-                {week.map(date => makeHeatmapWeek(dataByDate, date, todayKey, setTooltip, useMultiColor))}
-              </div>
-            ))}
-          </div>
+          <div className="heatmapMonths">{combinedColumns?.monthLabels}</div>
+          <div className="heatmap">{combinedColumns?.weekColumns}</div>
         </div>
       }
     </div>
@@ -260,6 +209,64 @@ function Heatmap({ range, dataByDate }: { range: { start: string, end: string },
       }</div>
     </div>}
   </div>
+}
+
+type HeatmapWeek = Array<string | null>
+
+type HeatmapMonthBlock = ReturnType<typeof graph.heatmap.monthBlocks>[number]
+
+type HeatmapRenderContext = {
+  dataByDate: Record<string, DayEntry>
+  todayKey: string
+  setTooltip: Dispatch<SetStateAction<HeatmapTooltip | null>>
+  useMultiColor: boolean
+}
+
+const renderHeatmapWeekColumn = (week: HeatmapWeek, keyPrefix: string, context: HeatmapRenderContext) => (
+  <div className="heatmapWeek" key={`week-${keyPrefix}`}>
+    {week.map((date, dayIndex) => {
+      if (!date) return <div key={`empty-${keyPrefix}-${dayIndex}`} className="heatmapSpacer" />
+      return makeHeatmapWeek(context.dataByDate, date, context.todayKey, context.setTooltip, context.useMultiColor)
+    })}
+  </div>
+)
+
+function renderHeatmapMonthBlock(block: HeatmapMonthBlock, blockIndex: number, context: HeatmapRenderContext) {
+  const monthLabels: ReactNode[] = []
+  const weekColumns: ReactNode[] = []
+  block.weeks.forEach((week, weekIndex) => {
+    const keyPrefix = `${blockIndex}-${weekIndex}`
+    monthLabels.push(<div className="heatmapMonth" key={`month-${keyPrefix}`}>{weekIndex === 0 ? block.label : ''}</div>)
+    weekColumns.push(renderHeatmapWeekColumn(week, keyPrefix, context))
+  })
+  return <div className="heatmapMonthBlock" key={`month-${blockIndex}-${block.label}`}>
+    <div className="heatmapMonths">{monthLabels}</div>
+    <div className="heatmap">{weekColumns}</div>
+  </div>
+}
+
+
+function buildCombinedHeatmapColumns(weeks: HeatmapWeek[], context: HeatmapRenderContext) {
+  function getCombinedMonthLabel(week: HeatmapWeek, dataByDate: Record<string, DayEntry>, lastMonthLabel: string) {
+    const anchor = week.find((date): date is string => Boolean(date && dataByDate[date])) ?? week.find((date): date is string => Boolean(date))
+    if (!anchor) return { label: '', lastMonthLabel }
+    const parts = anchor.split('-')
+    const month = parts.length === 3 ? Number.parseInt(parts[1], 10) : Number.NaN
+    if (!Number.isFinite(month)) return { label: '', lastMonthLabel }
+    const label = months.short[month - 1] ?? ''
+    if (label && label !== lastMonthLabel) return { label, lastMonthLabel: label }
+    return { label: '', lastMonthLabel }
+  }
+  const monthLabels: ReactNode[] = []
+  const weekColumns: ReactNode[] = []
+  let lastMonthLabel = ''
+  weeks.forEach((week, weekIndex) => {
+    const month = getCombinedMonthLabel(week, context.dataByDate, lastMonthLabel)
+    lastMonthLabel = month.lastMonthLabel
+    monthLabels.push(<div className="heatmapMonth" key={`month-combined-${weekIndex}`}>{month.label}</div>)
+    weekColumns.push(renderHeatmapWeekColumn(week, `combined-${weekIndex}`, context))
+  })
+  return { monthLabels, weekColumns }
 }
 
 function makeHeatmapWeek(
