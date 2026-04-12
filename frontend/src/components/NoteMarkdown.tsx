@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 type NoteMarkdownProps = { text: string }
 
@@ -10,12 +10,9 @@ const stripHeading = (line: string) => line.replace(/^(#{1,3})\s+/, '').trim()
 const stripUnordered = (line: string) => line.replace(/^\s*[-*]\s+/, '').trim()
 const stripOrdered = (line: string) => line.replace(/^\s*\d+\.\s+/, '').trim()
 
-const renderHardBreaks = (lines: string[], keyPrefix: string) => {
-  return lines.map((line, index) => <Fragment key={`${keyPrefix}-${index}`}>
-    {line.trim()}
-    {index < lines.length - 1 && <br />}
-  </Fragment>)
-}
+const renderParagraphLines = (lines: string[], keyPrefix: string) => (
+  lines.map((line, index) => <span className="noteMarkdownLine" key={`${keyPrefix}-${index}`}>{line.trim()}</span>)
+)
 
 export default function NoteMarkdown({ text }: NoteMarkdownProps) {
   const lines = text.split(/\r?\n/)
@@ -78,9 +75,8 @@ export default function NoteMarkdown({ text }: NoteMarkdownProps) {
       index += 1
     }
     if (paragraphLines.length > 0) blocks.push(<p key={`p-${index}`}>
-      {renderHardBreaks(paragraphLines, `p-${index}`)}
+      {renderParagraphLines(paragraphLines, `p-${index}`)}
     </p>)
   }
-
   return <div className="noteMarkdown">{blocks}</div>
 }

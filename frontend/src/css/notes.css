@@ -44,28 +44,43 @@
 }
 
 .noteMarkdown {
-  line-height: 1.6;
+  line-height: 1.3;
   color: var(--text);
+  gap: 12px;
 }
 
 .noteMarkdown :is(h2, h3, h4) {
   margin: 0;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .noteMarkdown h2 {
-  font-size: 20px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 34%, var(--panel-edge));
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
+  font-size: 22px;
 }
 
 .noteMarkdown h3 {
+  color: color-mix(in srgb, var(--accent) 68%, var(--text));
   font-size: 17px;
 }
 
 .noteMarkdown h4 {
+  color: color-mix(in srgb, var(--accent) 48%, var(--text));
   font-size: 15px;
 }
 
 .noteMarkdown p {
   margin: 0;
+  display: grid;
+  gap: 0.65em;
+}
+
+.noteMarkdownLine {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .noteMarkdown :is(ul, ol) {
