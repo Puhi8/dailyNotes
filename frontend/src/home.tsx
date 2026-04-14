@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { IndividualStatData, ServerData } from './data/types'
 import ErrorState from './components/ErrorState'
 import { api } from './data/api'
-import HomeGraphs from './components/HomeGraphs'
 
 const YESTERDAY_STACK_HEIGHT = 228
 const MOBILE_WIDGET_FOCUS_MAX_WIDTH = 900
+const HomeGraphs = lazy(() => import('./components/HomeGraphs'))
 
 export default function Home() {
   const [data, setData] = useState<ServerData | null>(null)
@@ -98,7 +98,9 @@ export default function Home() {
       <div className="homeActions">
         <Link className="stateButton" to="/today">Finish the day</Link>
       </div>
-      <HomeGraphs data={data} />
+      <Suspense fallback={<div className="chartCard">Loading graphs...</div>}>
+        <HomeGraphs data={data} />
+      </Suspense>
     </div>
   )
 }

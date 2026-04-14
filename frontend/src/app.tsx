@@ -1,18 +1,19 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
 import StartupGate from './components/StartupGate'
-import Login from './pages/Login'
-import Home from './home'
-import Accomplishments from './pages/Accomplishments'
-import Notes from './pages/Notes'
-import NoteDetail from './pages/NoteDetail'
-import Settings from './pages/Settings'
-import SingleDay from './pages/SingleDay'
 import { useAndroidBackButton } from './utils/hardwareBack'
+
+const Login = lazy(() => import('./pages/Login'))
+const Home = lazy(() => import('./home'))
+const Accomplishments = lazy(() => import('./pages/Accomplishments'))
+const Notes = lazy(() => import('./pages/Notes'))
+const NoteDetail = lazy(() => import('./pages/NoteDetail'))
+const Settings = lazy(() => import('./pages/Settings'))
+const SingleDay = lazy(() => import('./pages/SingleDay'))
 
 const routerBasename = (() => {
   const baseUrl = import.meta.env.BASE_URL || '/'
@@ -115,24 +116,26 @@ function AppShell() {
       </div>
     </nav>}
     <main className="appContent">
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/"
-          element={<RequireAuth><HomeGate /></RequireAuth>}
-        />
-        {lockedRouts.map(item => (
+      <Suspense fallback={<div className="state">Loading...</div>}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
           <Route
-            key={item.path}
-            path={item.path}
-            element={<RequireAuth>
-              <RequireUnlock title={item.lockTitle} message={item.lockMessage}>
-                {item.item}
-              </RequireUnlock>
-            </RequireAuth>}
+            path="/"
+            element={<RequireAuth><HomeGate /></RequireAuth>}
           />
-        ))}
-      </Routes>
+          {lockedRouts.map(item => (
+            <Route
+              key={item.path}
+              path={item.path}
+              element={<RequireAuth>
+                <RequireUnlock title={item.lockTitle} message={item.lockMessage}>
+                  {item.item}
+                </RequireUnlock>
+              </RequireAuth>}
+            />
+          ))}
+        </Routes>
+      </Suspense>
     </main>
   </div>
 }
