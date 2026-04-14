@@ -24,6 +24,34 @@ patch_android_version() {
   perl -0pi -e 's/^([ \t]*)versionName[^\n]*/$1 . "versionName \"$ENV{ANDROID_VERSION_NAME}\""/em' "$build_gradle"
 }
 
+patch_android_secure_window() {
+  local app_id package_path main_activity
+
+  app_id="$(read_capacitor_app_id)"
+  [[ -n "$app_id" ]] || die "Could not read appId from $ROOT_DIR/capacitor.config.ts"
+  package_path="${app_id//.//}"
+  main_activity="$ANDROID_DIR/app/src/main/java/$package_path/MainActivity.java"
+
+  [[ -f "$main_activity" ]] || die "Android MainActivity not found: $main_activity"
+
+  cat > "$main_activity" <<JAVA
+package $app_id;
+
+import android.os.Bundle;
+import android.view.WindowManager;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+    super.onCreate(savedInstanceState);
+  }
+}
+JAVA
+}
+
 read_capacitor_app_id() {
   awk -F"'" '/appId:/ { print $2; exit }' "$ROOT_DIR/capacitor.config.ts"
 }
@@ -76,5 +104,6 @@ export ANDROID_VERSION_CODE
 )
 
 patch_android_version
+patch_android_secure_window
 
 echo "Prepared generated Android project version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE)"

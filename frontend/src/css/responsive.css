@@ -106,3 +106,62 @@
     font-size: 13px;
   }
 }
+
+@media (max-width: 560px) {
+  .panelCard {
+    --panel-card-padding-x: 14px;
+    padding: 14px var(--panel-card-padding-x);
+  }
+
+  .panelStack {
+    gap: 12px;
+  }
+
+  .panelRow {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 8px;
+  }
+
+  .panelRowTopAlign {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .panelRowValue {
+    justify-self: stretch;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .panelRowValueServerWrap {
+    max-width: 100%;
+  }
+
+  .panelRowValueServerText {
+    max-width: 100%;
+  }
+
+  .panelInlineButton {
+    padding: 5px 9px;
+  }
+
+  .panelInlineSelect {
+    min-width: 0;
+    width: min(100%, 190px);
+  }
+
+  .rangeRow {
+    gap: 8px;
+  }
+
+  .editorActions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .noteInputSection .noteMarkdownEditor {
+    width: calc(100% + (var(--panel-card-padding-x, 14px) * 2));
+    max-width: none;
+    margin-inline: calc(var(--panel-card-padding-x, 14px) * -1);
+  }
+}

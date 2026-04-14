@@ -43,6 +43,13 @@ body {
   min-height: 100vh;
 }
 
+.privacyScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000;
+}
+
 :is(.stateCard, .panelCard, .statsWidget, .chartCard) {
   background: var(--panel-strong);
   border: 1px solid var(--panel-edge);

@@ -192,7 +192,8 @@
 }
 
 .panelCard {
-  padding: 18px 20px;
+  --panel-card-padding-x: 20px;
+  padding: 18px var(--panel-card-padding-x);
   border-radius: var(--radius);
   display: grid;
   gap: 10px;

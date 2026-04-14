@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
@@ -23,6 +24,7 @@ const shouldUseHashRouter = (!Capacitor.isNativePlatform() && import.meta.env.PR
 export default function App() {
   return <AuthProvider>
     <SecurityProvider>
+      <PrivacyScreen />
       {shouldUseHashRouter
         ? <HashRouter>
           <AndroidBackButtonBridge />
@@ -34,6 +36,42 @@ export default function App() {
         </BrowserRouter>}
     </SecurityProvider>
   </AuthProvider>
+}
+
+function PrivacyScreen() {
+  const [isPrivate, setIsPrivate] = useState(false)
+  useEffect(() => {
+    const hideIfVisible = () => setIsPrivate(document.visibilityState !== 'visible')
+    const show = () => setIsPrivate(true)
+    const onVisibilityChange = () => setIsPrivate(document.visibilityState !== 'visible')
+
+    window.addEventListener('blur', show)
+    window.addEventListener('focus', hideIfVisible)
+    window.addEventListener('pagehide', show)
+    window.addEventListener('pageshow', hideIfVisible)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    let isMounted = true
+    let removeAppStateListener: (() => void) | null = null
+    void CapacitorApp.addListener('appStateChange', ({ isActive }) => { setIsPrivate(!isActive) })
+      .then(handle => {
+        if (!isMounted) {
+          void handle.remove()
+          return
+        }
+        removeAppStateListener = () => { void handle.remove() }
+      }).catch(() => { })
+    return () => {
+      isMounted = false
+      window.removeEventListener('blur', show)
+      window.removeEventListener('focus', hideIfVisible)
+      window.removeEventListener('pagehide', show)
+      window.removeEventListener('pageshow', hideIfVisible)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      removeAppStateListener?.()
+    }
+  }, [])
+  return isPrivate ? <div className="privacyScreen" aria-hidden="true" /> : null
 }
 
 type LockedRoute = {

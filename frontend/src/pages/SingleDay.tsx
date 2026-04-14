@@ -184,7 +184,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
           </div>
         }
       </div>
-      <div className="panelSection">
+      <div className="panelSection noteInputSection">
         <h2 className="panelTitle">Note (.md)</h2>
         <MarkdownEditor
           className="noteMarkdownEditor"
