@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type Mo
 import type { DayEntry, ServerData } from '../data/types'
 import graph, { type ChartPoint } from '../data/graph'
 import { LineChart, XAxis, YAxis, Line, ResponsiveContainer, CartesianGrid, Tooltip } from 'recharts'
-import { formatDateKey } from '../utils/functions'
 import { dayKey } from '../data/localCore'
 import { months } from '../data/data'
 
@@ -19,9 +18,11 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
   const showRawLine = lineMode !== 'avg10_all_days'
   const showAverageLine = lineMode !== 'raw'
   const pointLimit = graph.line.pointLimit(chartSize.width, graph.settings.line.compactness.get())
+  const todayKey = dayKey.today()
   const rangeDates = graph.dates.range(data.graph.start, data.graph.end)
-  const dateList = (rangeDates.length > 0 ? rangeDates : Object.keys(data.data)
-    .filter(date => date !== formatDateKey(new Date())).sort(graph.dates.compareKeys))
+  const dateList = (rangeDates.length > 0 ? rangeDates : Object.keys(data.data))
+    .filter(date => date !== todayKey)
+    .sort(graph.dates.compareKeys)
   const rangeStart = dateList.length > 0 ? dateList[0] : ''
   const rangeEnd = dateList.length > 0 ? dateList[dateList.length - 1] : ''
   const averageAllDaysOnly = lineMode === 'avg10_all_days'
@@ -63,7 +64,7 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
           averageAllDaysOnly={averageAllDaysOnly}
           onResize={setChartSize}
         />
-        : <Heatmap range={{ start: rangeStart, end: rangeEnd }} dataByDate={data.data} />
+        : <Heatmap range={{ start: rangeStart, end: rangeEnd }} dataByDate={data.data} todayKey={todayKey} />
       }
     </div>
   </section>
@@ -154,7 +155,11 @@ function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine,
   </ResponsiveContainer>
 }
 
-function Heatmap({ range, dataByDate }: { range: { start: string, end: string }, dataByDate: Record<string, DayEntry> }) {
+function Heatmap({ range, dataByDate, todayKey, }: {
+  range: { start: string, end: string }
+  dataByDate: Record<string, DayEntry>
+  todayKey: string
+}) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [tooltip, setTooltip] = useState<HeatmapTooltip | null>(null)
   const [splitByMonth, setSplitByMonth] = useState(false)
@@ -183,7 +188,7 @@ function Heatmap({ range, dataByDate }: { range: { start: string, end: string },
 
   if (!(weeks && weeks.length > 0)) return <div className="heatmapEmpty">No heatmap data</div>
 
-  const renderContext = { dataByDate, todayKey: dayKey.today(), setTooltip, useMultiColor }
+  const renderContext = { dataByDate, todayKey, setTooltip, useMultiColor }
   const tooltipEntries = tooltip ? Object.entries(dataByDate[tooltip.date]?.data ?? {}) : []
   const combinedColumns = splitByMonth ? null : buildCombinedHeatmapColumns(weeks, renderContext)
   return <div className="heatmapWrapper" ref={wrapperRef} onMouseLeave={() => setTooltip(null)}>
@@ -212,7 +217,6 @@ function Heatmap({ range, dataByDate }: { range: { start: string, end: string },
 }
 
 type HeatmapWeek = Array<string | null>
-
 type HeatmapMonthBlock = ReturnType<typeof graph.heatmap.monthBlocks>[number]
 
 type HeatmapRenderContext = {
