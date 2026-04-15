@@ -160,11 +160,7 @@ export function RequireUnlock({
   children,
   title = "Locked",
   message = "Enter your PIN to access this page.",
-}: {
-  children: ReactNode
-  title?: string
-  message?: string
-}) {
+}: { children: ReactNode, title?: string, message?: string }) {
   const { isUnlocked } = useSecurity()
   return <RequireReauth
     title={title}
