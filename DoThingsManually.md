@@ -33,3 +33,11 @@ cd frontend
 npm install
 npm run dev # Listens on port 9998
 ```
+
+### Dev Flags
+
+The privacy blur normally hides the app when it is not focused. During development, you can disable it from the browser console:
+
+```js
+localStorage.setItem('DEV', '1')
+```
