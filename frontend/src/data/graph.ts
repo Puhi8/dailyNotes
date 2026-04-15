@@ -7,7 +7,7 @@ import { getAccentColorRgb } from './theme'
 const GRAPH_SETTINGS_KEY = 'dailynotes.graphSettings'
 
 export const GRAPH_COMPACTNESS_MIN = 1
-export const GRAPH_COMPACTNESS_MAX = 15
+export const GRAPH_COMPACTNESS_MAX = 30
 const GRAPH_COMPACTNESS_DEFAULT = 8
 export type GraphLineMode = 'raw' | 'raw_plus_10' | 'avg10_all_days'
 export type ChartPoint = {
