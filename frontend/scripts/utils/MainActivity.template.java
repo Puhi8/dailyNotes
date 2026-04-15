@@ -9,6 +9,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
   private View privacyOverlay;
+  private volatile boolean privacyEnabled = true;
   private volatile boolean lockScreenActive;
 
   @Override
@@ -16,6 +17,12 @@ public class MainActivity extends BridgeActivity {
     super.onCreate(savedInstanceState);
     WebView webView = webView();
     if (webView != null) webView.addJavascriptInterface(new Object() {
+      @JavascriptInterface
+      public void setEnabled(boolean enabled) {
+        privacyEnabled = enabled;
+        if (!enabled) runOnUiThread(() -> privacy(false));
+      }
+
       @JavascriptInterface
       public void setLockScreenActive(boolean active) {
         lockScreenActive = active;
@@ -45,7 +52,7 @@ public class MainActivity extends BridgeActivity {
   private void privacy(boolean show) {
     View decorView = getWindow().getDecorView();
 
-    if (!show || lockScreenActive) {
+    if (!show || !privacyEnabled || lockScreenActive) {
       css(false);
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) decorView.setRenderEffect(null);
       if (privacyOverlay != null) {

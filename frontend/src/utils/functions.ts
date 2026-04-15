@@ -12,6 +12,17 @@ export function toUpperCase(string: string) {
   return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
+export const eventListener = {
+  window: (events: readonly (keyof WindowEventMap)[], listener: EventListener) => {
+    events.forEach(event => window.addEventListener(event, listener))
+    return () => events.forEach(event => window.removeEventListener(event, listener))
+  },
+  document: (events: readonly (keyof DocumentEventMap)[], listener: EventListener) => {
+    events.forEach(event => document.addEventListener(event, listener))
+    return () => events.forEach(event => document.removeEventListener(event, listener))
+  },
+}
+
 export function useObjectState<T extends object>(initialState: T) {
   const [state, setState] = useState<T>(initialState)
   const setPartial = useCallback((update: Partial<T> | ((prev: T) => Partial<T>)) => {

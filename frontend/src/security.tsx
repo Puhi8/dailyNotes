@@ -9,6 +9,7 @@ import { Button, LockInput } from './utils/simplifyReact'
 declare global {
   interface Window {
     DailyNotesPrivacy?: {
+      setEnabled?: (enabled: boolean) => void
       setLockScreenActive?: (active: boolean) => void
     }
   }

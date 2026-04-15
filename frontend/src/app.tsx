@@ -5,6 +5,7 @@ import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './s
 import { AuthProvider, RequireAuth, useAuth } from './auth'
 import StartupGate from './components/StartupGate'
 import { useAndroidBackButton } from './utils/hardwareBack'
+import { eventListener } from './utils/functions'
 
 const Login = lazy(() => import('./pages/Login'))
 const Home = lazy(() => import('./home'))
@@ -21,9 +22,18 @@ const routerBasename = (() => {
 
 const isNativePlatform = Capacitor.isNativePlatform()
 const shouldUseHashRouter = (!isNativePlatform && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
+const DEV_PRIVACY_KEY = 'DEV'
+const PRIVACY_DEV_EVENTS = ['storage', 'blur', 'focus'] as const
+const PRIVACY_FOCUS_EVENTS = ['blur', 'focus'] as const
 
-export default function App() {
-  return <AuthProvider>
+const readPrivacyBlurEnabled = () => {
+  if (typeof window === 'undefined') return true
+  try { return window.localStorage.getItem(DEV_PRIVACY_KEY) !== '1' }
+  catch { return true }
+}
+
+export default () => (
+  <AuthProvider>
     <SecurityProvider>
       <PrivacyScreen />
       {shouldUseHashRouter
@@ -37,36 +47,61 @@ export default function App() {
         </BrowserRouter>}
     </SecurityProvider>
   </AuthProvider>
-}
+)
 
 function PrivacyScreen() {
   const [isPrivate, setIsPrivate] = useState(false)
+  const [privacyBlurEnabled, setPrivacyBlurEnabled] = useState(readPrivacyBlurEnabled)
+
   useEffect(() => {
-    if (isNativePlatform) return
+    const updatePrivacyBlurEnabled = () => {
+      const enabled = readPrivacyBlurEnabled()
+      setPrivacyBlurEnabled(enabled)
+      window.DailyNotesPrivacy?.setEnabled?.(enabled)
+    }
+    updatePrivacyBlurEnabled()
+    const removeWindowListeners = eventListener.window(PRIVACY_DEV_EVENTS, updatePrivacyBlurEnabled)
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacyBlurEnabled)
+    return () => {
+      removeWindowListeners()
+      removeDocumentListeners()
+      window.DailyNotesPrivacy?.setEnabled?.(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isNativePlatform || !privacyBlurEnabled) {
+      setIsPrivate(false)
+      return
+    }
     const isLockScreenVisible = () => (
       document.documentElement.classList.contains('lockScreenActive') ||
       Boolean(document.querySelector('.state-locked'))
     )
     const updatePrivacy = () => {
+      if (!readPrivacyBlurEnabled()) {
+        setPrivacyBlurEnabled(false)
+        setIsPrivate(false)
+        return
+      }
       const shouldProtect = document.visibilityState !== 'visible' || !document.hasFocus()
       setIsPrivate(shouldProtect && !isLockScreenVisible())
     }
     updatePrivacy()
-    window.addEventListener('blur', updatePrivacy)
-    window.addEventListener('focus', updatePrivacy)
-    document.addEventListener('visibilitychange', updatePrivacy)
+    const removeWindowListeners = eventListener.window(PRIVACY_FOCUS_EVENTS, updatePrivacy)
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacy)
     return () => {
-      window.removeEventListener('blur', updatePrivacy)
-      window.removeEventListener('focus', updatePrivacy)
-      document.removeEventListener('visibilitychange', updatePrivacy)
+      removeWindowListeners()
+      removeDocumentListeners()
     }
-  }, [])
+  }, [privacyBlurEnabled])
 
+  const showPrivacy = privacyBlurEnabled && isPrivate
   useEffect(() => {
-    document.documentElement.classList.toggle('privacyActive', isPrivate)
+    document.documentElement.classList.toggle('privacyActive', showPrivacy)
     return () => document.documentElement.classList.remove('privacyActive')
-  }, [isPrivate])
-  if (isNativePlatform || !isPrivate) return null
+  }, [showPrivacy])
+  if (isNativePlatform || !showPrivacy) return null
   return <div className="privacyScreen" aria-hidden="true" />
 }
 
