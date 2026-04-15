@@ -6,6 +6,14 @@ import { manageLocalStorage } from './utils/localProcessing'
 import { useObjectState } from './utils/functions'
 import { Button, LockInput } from './utils/simplifyReact'
 
+declare global {
+  interface Window {
+    DailyNotesPrivacy?: {
+      setLockScreenActive?: (active: boolean) => void
+    }
+  }
+}
+
 type UnlockScope = 'home' | 'app'
 
 type SecurityContextValue = {
@@ -251,6 +259,16 @@ export function RequireReauth({
     if (isCompleted || !hasPin || !biometricSettled) return
     pinInputRef.current?.focus()
   }, [biometricSettled, hasPin, isCompleted])
+
+  useEffect(() => {
+    const isLockScreen = hasPin && !isCompleted
+    document.documentElement.classList.toggle('lockScreenActive', isLockScreen)
+    window.DailyNotesPrivacy?.setLockScreenActive?.(isLockScreen)
+    return () => {
+      document.documentElement.classList.remove('lockScreenActive')
+      window.DailyNotesPrivacy?.setLockScreenActive?.(false)
+    }
+  }, [hasPin, isCompleted])
 
   if (!hasPin || isCompleted) return <>{children}</>
 

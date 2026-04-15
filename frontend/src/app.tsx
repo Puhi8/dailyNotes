@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { App as CapacitorApp } from '@capacitor/app'
 import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
@@ -20,7 +19,8 @@ const routerBasename = (() => {
   return baseUrl === '/' ? undefined : baseUrl.replace(/\/$/, '')
 })()
 
-const shouldUseHashRouter = (!Capacitor.isNativePlatform() && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
+const isNativePlatform = Capacitor.isNativePlatform()
+const shouldUseHashRouter = (!isNativePlatform && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
 
 export default function App() {
   return <AuthProvider>
@@ -42,37 +42,32 @@ export default function App() {
 function PrivacyScreen() {
   const [isPrivate, setIsPrivate] = useState(false)
   useEffect(() => {
-    const hideIfVisible = () => setIsPrivate(document.visibilityState !== 'visible')
-    const show = () => setIsPrivate(true)
-    const onVisibilityChange = () => setIsPrivate(document.visibilityState !== 'visible')
-
-    window.addEventListener('blur', show)
-    window.addEventListener('focus', hideIfVisible)
-    window.addEventListener('pagehide', show)
-    window.addEventListener('pageshow', hideIfVisible)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
-    let isMounted = true
-    let removeAppStateListener: (() => void) | null = null
-    void CapacitorApp.addListener('appStateChange', ({ isActive }) => { setIsPrivate(!isActive) })
-      .then(handle => {
-        if (!isMounted) {
-          void handle.remove()
-          return
-        }
-        removeAppStateListener = () => { void handle.remove() }
-      }).catch(() => { })
+    if (isNativePlatform) return
+    const isLockScreenVisible = () => (
+      document.documentElement.classList.contains('lockScreenActive') ||
+      Boolean(document.querySelector('.state-locked'))
+    )
+    const updatePrivacy = () => {
+      const shouldProtect = document.visibilityState !== 'visible' || !document.hasFocus()
+      setIsPrivate(shouldProtect && !isLockScreenVisible())
+    }
+    updatePrivacy()
+    window.addEventListener('blur', updatePrivacy)
+    window.addEventListener('focus', updatePrivacy)
+    document.addEventListener('visibilitychange', updatePrivacy)
     return () => {
-      isMounted = false
-      window.removeEventListener('blur', show)
-      window.removeEventListener('focus', hideIfVisible)
-      window.removeEventListener('pagehide', show)
-      window.removeEventListener('pageshow', hideIfVisible)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      removeAppStateListener?.()
+      window.removeEventListener('blur', updatePrivacy)
+      window.removeEventListener('focus', updatePrivacy)
+      document.removeEventListener('visibilitychange', updatePrivacy)
     }
   }, [])
-  return isPrivate ? <div className="privacyScreen" aria-hidden="true" /> : null
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('privacyActive', isPrivate)
+    return () => document.documentElement.classList.remove('privacyActive')
+  }, [isPrivate])
+  if (isNativePlatform || !isPrivate) return null
+  return <div className="privacyScreen" aria-hidden="true" />
 }
 
 type LockedRoute = {

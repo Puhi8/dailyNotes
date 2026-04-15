@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="${ANDROID_DIR:-$ROOT_DIR/android}"
 ANDROID_VERSION_HELPER="${ANDROID_VERSION_HELPER:-$ROOT_DIR/scripts/android-version.sh}"
+ANDROID_MAIN_ACTIVITY_TEMPLATE="${ANDROID_MAIN_ACTIVITY_TEMPLATE:-$ROOT_DIR/scripts/utils/MainActivity.template.java}"
 CAPACITOR_TEMPLATE="${CAPACITOR_TEMPLATE:-$ROOT_DIR/node_modules/@capacitor/cli/assets/android-template.tar.gz}"
 
 die() {
@@ -24,7 +25,7 @@ patch_android_version() {
   perl -0pi -e 's/^([ \t]*)versionName[^\n]*/$1 . "versionName \"$ENV{ANDROID_VERSION_NAME}\""/em' "$build_gradle"
 }
 
-patch_android_secure_window() {
+patch_android_privacy_preview() {
   local app_id package_path main_activity
 
   app_id="$(read_capacitor_app_id)"
@@ -33,23 +34,9 @@ patch_android_secure_window() {
   main_activity="$ANDROID_DIR/app/src/main/java/$package_path/MainActivity.java"
 
   [[ -f "$main_activity" ]] || die "Android MainActivity not found: $main_activity"
+  [[ -f "$ANDROID_MAIN_ACTIVITY_TEMPLATE" ]] || die "Android MainActivity template not found: $ANDROID_MAIN_ACTIVITY_TEMPLATE"
 
-  cat > "$main_activity" <<JAVA
-package $app_id;
-
-import android.os.Bundle;
-import android.view.WindowManager;
-
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {
-  @Override
-  protected void onCreate(Bundle savedInstanceState) {
-    getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-    super.onCreate(savedInstanceState);
-  }
-}
-JAVA
+  CAPACITOR_APP_ID="$app_id" perl -pe 's/__CAPACITOR_APP_ID__/$ENV{CAPACITOR_APP_ID}/g' "$ANDROID_MAIN_ACTIVITY_TEMPLATE" > "$main_activity"
 }
 
 read_capacitor_app_id() {
@@ -104,6 +91,6 @@ export ANDROID_VERSION_CODE
 )
 
 patch_android_version
-patch_android_secure_window
+patch_android_privacy_preview
 
 echo "Prepared generated Android project version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE)"
