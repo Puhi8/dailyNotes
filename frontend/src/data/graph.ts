@@ -64,7 +64,7 @@ const calculateGraphPointLimit = (width: number, compactness: number) => {
   if (!Number.isFinite(width) || width <= 0) return 0
   const ratio = 1 - (clampCompactness(compactness) - GRAPH_COMPACTNESS_MIN) / (GRAPH_COMPACTNESS_MAX - GRAPH_COMPACTNESS_MIN)
   const maxSpacing = 40
-  const minSpacing = 7
+  const minSpacing = 4
   const spacing = maxSpacing - (maxSpacing - minSpacing) * ratio
   return Math.max(7, Math.floor(width / spacing))
 }
