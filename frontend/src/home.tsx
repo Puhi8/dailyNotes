@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { IndividualStatData, ServerData } from './data/types'
 import ErrorState from './components/ErrorState'
 import { api } from './data/api'
-import HomeGraphs from './components/HomeGraphs'
 
 const YESTERDAY_STACK_HEIGHT = 228
 const MOBILE_WIDGET_FOCUS_MAX_WIDTH = 900
+const HomeGraphs = lazy(() => import('./components/HomeGraphs'))
 
 export default function Home() {
   const [data, setData] = useState<ServerData | null>(null)
@@ -79,28 +79,28 @@ export default function Home() {
   if (isLoading) return <div className="state">Loading...</div>
   if (error) return <ErrorState error={error} onReload={() => setReloadToken(token => token + 1)} />
   if (!data) return <div className="state">No activity history yet.</div>
-  return (
-    <div className="home">
-      {/* if mobile: show the focus options */}
-      {showWidgetFocus && <div className="topWidgetFocus">
-        <button onClick={() => document.getElementById('widgetYesterday')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>Yesterday</button>
-        <button onClick={() => document.getElementById('widget7')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>7</button>
-        <button onClick={() => document.getElementById('widget30')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>30</button>
-      </div>}
-      <div className={`topWidgets${shouldStackStats ? ' topWidgetsStacked' : ''}`} ref={topWidgetsRef}>
-        <div className='statsWidget' id='widgetYesterday' ref={yesterdayWidgetRef}>
-          <h3>Yesterday</h3>
-          {data.yesterday.map(item => (<p key={item.text}>{item.text}: {typeof item.value == "boolean" ? item.value ? "Done" : "Felid" : item.value}</p>))}
-        </div>
-        {data.stats[0] ? DisplayStats(data.stats[0]) : null}
-        {data.stats[1] ? DisplayStats(data.stats[1]) : null}
+  return <div className="home">
+    {/* if mobile: show the focus options */}
+    {showWidgetFocus && <div className="topWidgetFocus">
+      <button onClick={() => document.getElementById('widgetYesterday')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>Yesterday</button>
+      <button onClick={() => document.getElementById('widget7')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>7</button>
+      <button onClick={() => document.getElementById('widget30')?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' })}>30</button>
+    </div>}
+    <div className={`topWidgets${shouldStackStats ? ' topWidgetsStacked' : ''}`} ref={topWidgetsRef}>
+      <div className='statsWidget' id='widgetYesterday' ref={yesterdayWidgetRef}>
+        <h3>Yesterday</h3>
+        {data.yesterday.map(item => (<p key={item.text}>{item.text}: {typeof item.value == "boolean" ? item.value ? "Done" : "Felid" : item.value}</p>))}
       </div>
-      <div className="homeActions">
-        <Link className="stateButton" to="/today">Finish the day</Link>
-      </div>
-      <HomeGraphs data={data} />
+      {data.stats[0] ? DisplayStats(data.stats[0]) : null}
+      {data.stats[1] ? DisplayStats(data.stats[1]) : null}
     </div>
-  )
+    <div className="homeActions">
+      <Link className="stateButton" to="/today">Finish the day</Link>
+    </div>
+    <Suspense fallback={<div className="chartCard">Loading graphs...</div>}>
+      <HomeGraphs data={data} />
+    </Suspense>
+  </div>
 }
 
 const DisplayStats = ({ dayCount, stats }: { dayCount: number, stats: IndividualStatData[] }) => (

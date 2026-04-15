@@ -4,6 +4,7 @@ import ErrorState from '../components/ErrorState'
 import { useObjectState } from '../utils/functions'
 import { normalizeAccomplishmentType } from '../data/localCore'
 import { registerCloseOnBack } from '../utils/hardwareBack'
+import { Button, LockInput, ModalShell } from '../utils/simplifyReact'
 
 const accomplishmentTypeLabel = (value: string) => (normalizeAccomplishmentType(value) === 'text' ? 'Text' : 'Checkbox')
 const moveItem = (list: AccomplishmentItem[], sourceIndex: number, targetIndex: number) => {
@@ -210,12 +211,10 @@ export default function Accomplishments() {
         <form className="lockForm" onSubmit={handleAdd}>
           <div className="panelSectionHeader">
             <h2 className="panelTitle">Add new</h2>
-            <button className="stateButton" type="submit" disabled={form.isAdding}>{form.isAdding ? 'Adding...' : 'Add'}</button>
+            <Button.primary type="submit" disabled={form.isAdding}>{form.isAdding ? 'Adding...' : 'Add'}</Button.primary>
           </div>
           <div className="accomplishmentAddFields">
-            <input
-              className="lockInput"
-              type="text"
+            <LockInput.text
               value={form.newName}
               placeholder="New accomplishment"
               onChange={event => {
@@ -238,9 +237,7 @@ export default function Accomplishments() {
       <div className="panelSection">
         <div className="panelSectionHeader">
           <h2 className="panelTitle">Current</h2>
-          <button className="stateButton stateButtonSecondary panelInlineButton" type="button" onClick={handleToggleOrdering}>
-            {isOrdering ? 'Done' : 'Edit order'}
-          </button>
+          <Button.secondaryInline onClick={handleToggleOrdering}>{isOrdering ? 'Done' : 'Edit order'}</Button.secondaryInline>
         </div>
         {items.length === 0
           ? <div className="panelEmpty">No accomplishments yet.</div>
@@ -255,40 +252,22 @@ export default function Accomplishments() {
                   <span className="accomplishmentMeta">{accomplishmentTypeLabel(item.type)}</span>
                   {isOrdering
                     ? <>
-                      <button
-                        className="stateButton stateButtonSecondary panelInlineButton"
-                        type="button"
-                        onClick={() => { void handleMove(index, -1) }}
-                        disabled={isSavingOrder || index === 0}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        className="stateButton stateButtonSecondary panelInlineButton"
-                        type="button"
-                        onClick={() => { void handleMove(index, 1) }}
-                        disabled={isSavingOrder || index === items.length - 1}
-                      >
+                      <Button.secondaryInline onClick={() => { void handleMove(index, -1) }} disabled={isSavingOrder || index === 0}>↑</Button.secondaryInline>
+                      <Button.secondaryInline onClick={() => { void handleMove(index, 1) }} disabled={isSavingOrder || index === items.length - 1}>
                         ↓
-                      </button>
+                      </Button.secondaryInline>
                     </>
                     : <>
-                      <button
-                        className="stateButton stateButtonSecondary panelInlineButton"
-                        type="button"
-                        onClick={() => handleOpenEdit(item)}
-                        disabled={pendingId === item.id || isSavingOrder}
-                      >
+                      <Button.secondaryInline onClick={() => handleOpenEdit(item)} disabled={pendingId === item.id || isSavingOrder}>
                         Edit
-                      </button>
-                      <button
-                        className={`stateButton stateButtonSecondary panelInlineButton accomplishmentButton ${item.active ? 'accomplishmentButtonDanger' : 'accomplishmentButtonEnable'}`}
-                        type="button"
+                      </Button.secondaryInline>
+                      <Button.secondaryInline
+                        className={`accomplishmentButton ${item.active ? 'accomplishmentButtonDanger' : 'accomplishmentButtonEnable'}`}
                         onClick={() => (item.active ? handleDelete(item) : handleEnable(item))}
                         disabled={pendingId === item.id || isSavingOrder}
                       >
                         {item.active ? (item.used ? 'Disable' : 'Delete') : 'Enable'}
-                      </button>
+                      </Button.secondaryInline>
                     </>
                   }
                 </span>
@@ -299,60 +278,53 @@ export default function Accomplishments() {
         {errors.action && <div className="stateMeta stateMetaError">{errors.action}</div>}
       </div>
     </section>
-    {editingItem && <div className="modalBackdrop" role="presentation">
-      <div className="stateCard modalCard" role="dialog" aria-modal="true" aria-labelledby="accomplishment-edit-title">
-        <h2 id="accomplishment-edit-title">Edit accomplishment</h2>
-        <p>Changes apply to new days.</p>
-        <form className="lockForm" onSubmit={handleSaveEdit}>
-          <div className="accomplishmentEditFields">
-            <input
-              className="lockInput"
-              type="text"
-              value={form.editName}
-              onChange={event => {
-                setForm({ editName: event.target.value })
-                setErrors({ edit: null })
-              }}
-              autoFocus
-            />
-            <select
-              className="lockInput"
-              value={form.editType}
-              onChange={event => {
-                setForm({ editType: normalizeAccomplishmentType(event.target.value) })
-                setErrors({ edit: null })
-              }}
-            >
-              <option value="">Checkbox</option>
-              <option value="text">Text</option>
-            </select>
-          </div>
-          <div className="lockActions">
-            <button className="stateButton" type="submit" disabled={pendingId === editingItem.id}>Save</button>
-            <button className="stateButton stateButtonSecondary" type="button" onClick={handleCloseEdit}>Go back</button>
-          </div>
-        </form>
-        <div className="accomplishmentMeta">Danger zone: force delete removes this accomplishment from all days, even when it was used.</div>
-        <div className="lockActions">
-          <button
-            className="stateButton stateButtonSecondary accomplishmentButton accomplishmentButtonDanger"
-            type="button"
-            onClick={() => { void handleForceDelete() }}
-            disabled={pendingId === editingItem.id}
+    {editingItem && <ModalShell titleId="accomplishment-edit-title">
+      <h2 id="accomplishment-edit-title">Edit accomplishment</h2>
+      <p>Changes apply to new days.</p>
+      <form className="lockForm" onSubmit={handleSaveEdit}>
+        <div className="accomplishmentEditFields">
+          <LockInput.text
+            value={form.editName}
+            onChange={event => {
+              setForm({ editName: event.target.value })
+              setErrors({ edit: null })
+            }}
+            autoFocus
+          />
+          <select
+            className="lockInput"
+            value={form.editType}
+            onChange={event => {
+              setForm({ editType: normalizeAccomplishmentType(event.target.value) })
+              setErrors({ edit: null })
+            }}
           >
-            {confirmingForceDelete ? 'Confirm force delete' : 'Force delete'}
-          </button>
-          {confirmingForceDelete && <button
-            className="stateButton stateButtonSecondary"
-            type="button"
-            onClick={() => setConfirmingForceDelete(false)}
-            disabled={pendingId === editingItem.id}
-          >
-            Cancel
-          </button>}
+            <option value="">Checkbox</option>
+            <option value="text">Text</option>
+          </select>
         </div>
-        {errors.edit && <div className="stateMeta stateMetaError">{errors.edit}</div>}
+        <div className="lockActions">
+          <Button.primary type="submit" disabled={pendingId === editingItem.id}>Save</Button.primary>
+          <Button.secondary onClick={handleCloseEdit}>Go back</Button.secondary>
+        </div>
+      </form>
+      <div className="accomplishmentMeta">Danger zone: force delete removes this accomplishment from all days, even when it was used.</div>
+      <div className="lockActions">
+        <Button.secondary
+          className="accomplishmentButton accomplishmentButtonDanger"
+          onClick={() => { void handleForceDelete() }}
+          disabled={pendingId === editingItem.id}
+        >
+          {confirmingForceDelete ? 'Confirm force delete' : 'Force delete'}
+        </Button.secondary>
+        {confirmingForceDelete && <Button.secondary
+          onClick={() => setConfirmingForceDelete(false)}
+          disabled={pendingId === editingItem.id}
+        >
+          Cancel
+        </Button.secondary>}
       </div>
-    </div>}
+      {errors.edit && <div className="stateMeta stateMetaError">{errors.edit}</div>}
+    </ModalShell>}
   </div>
 }

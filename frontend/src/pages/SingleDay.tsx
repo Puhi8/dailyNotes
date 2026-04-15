@@ -159,8 +159,8 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         {entries.length === 0
           ? <div className="panelEmpty">No entries for {dayType}.</div>
           : <div className="editorList"> {
-            entries.map(([key, value]) => {
-              return <div className="editorRow" key={key}>
+            entries.map(([key, value]) => (
+              <div className="editorRow" key={key}>
                 <span className="editorLabel">{key}</span>
                 {typeof value === 'boolean'
                   ? <label className="editorSwitch">
@@ -180,11 +180,11 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
                   />
                 }
               </div>
-            })}
+            ))}
           </div>
         }
       </div>
-      <div className="panelSection">
+      <div className="panelSection noteInputSection">
         <h2 className="panelTitle">Note (.md)</h2>
         <MarkdownEditor
           className="noteMarkdownEditor"

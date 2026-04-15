@@ -1,4 +1,5 @@
 import { api } from '../data/api'
+import { Button } from '../utils/simplifyReact'
 
 type ErrorStateProps = {
   error: string
@@ -19,7 +20,7 @@ export default function ErrorState({
       <p>{message}</p>
       <div className="stateMeta">API: {api.config.baseUrl.get()}</div>
       <div className="stateMeta">Error: {error}</div>
-      <button className="stateButton" onClick={onReload}>Reload</button>
+      <Button.primary onClick={onReload}>Reload</Button.primary>
     </div>
   </div>
 }

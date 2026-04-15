@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { api } from '../data/api'
+import { Button, LockInput } from '../utils/simplifyReact'
 
 export default function Login() {
   const { login, logout } = useAuth()
@@ -46,37 +47,21 @@ export default function Login() {
       <p>First-time setup: use the password from your server <code>password</code> file.</p>
       {remoteSessionConnected && <div className="stateMeta">Connected. Sign out to disconnect remote backup.</div>}
       <form className="lockForm" onSubmit={handleSubmit}>
-        <input
-          className="lockInput"
-          type="password"
+        <LockInput.password
           placeholder="Server password"
           value={password}
           onChange={event => setPassword(event.target.value)}
           autoComplete="current-password"
         />
         <div className="lockActions">
-          <button className="stateButton" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
-          </button>
-          <button
-            className="stateButton stateButtonSecondary"
-            type="button"
-            onClick={() => navigate(backTarget, { replace: true })}
-          >
-            Go back
-          </button>
+          <Button.primary type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Sign in'}</Button.primary>
+          <Button.secondary onClick={() => navigate(backTarget, { replace: true })}>Go back</Button.secondary>
         </div>
       </form>
       {error && <div className="stateMeta stateMetaError">{error}</div>}
       {remoteSessionConnected && (
         <div className="lockActions">
-          <button
-            className="stateButton stateButtonSecondary"
-            type="button"
-            onClick={() => { logout(); setError(null) }}
-          >
-            Sign out
-          </button>
+          <Button.secondary onClick={() => { logout(); setError(null) }}>Sign out</Button.secondary>
         </div>
       )}
     </div>

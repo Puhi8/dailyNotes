@@ -109,7 +109,6 @@ const nodeAtOffset = (root: HTMLElement, offset: number) => {
     remaining -= length
     node = walker.nextNode()
   }
-
   return { node: root, offset: root.childNodes.length }
 }
 
@@ -132,10 +131,7 @@ const highlight = (root: HTMLElement, keepCursor: boolean) => {
   root.replaceChildren(markdownFragment(text))
   root.normalize()
   if (cursor) restoreCursor(root, cursor)
-  if (topBefore != null) {
-    const topAfter = root.getBoundingClientRect().top
-    window.scrollBy(0, topAfter - topBefore)
-  }
+  if (topBefore != null) window.scrollBy(0, root.getBoundingClientRect().top - topBefore)
 }
 
 export default function MarkdownEditor(props: MarkdownEditorProps) {
@@ -162,9 +158,7 @@ export default function MarkdownEditor(props: MarkdownEditorProps) {
   }, [value])
 
   useLayoutEffect(() => {
-    return () => {
-      if (highlightFrameRef.current != null) window.cancelAnimationFrame(highlightFrameRef.current)
-    }
+    return () => { if (highlightFrameRef.current != null) window.cancelAnimationFrame(highlightFrameRef.current) }
   }, [])
 
   return <div

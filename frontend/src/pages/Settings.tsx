@@ -10,6 +10,7 @@ import { useSecurity } from '../security'
 import type { StatusOptions } from '../data/types'
 import { toUpperCase, useObjectState } from '../utils/functions'
 import { registerCloseOnBack } from '../utils/hardwareBack'
+import { Button, ToggleSwitch } from '../utils/simplifyReact'
 
 type errorsType = {
   template: string | null
@@ -27,13 +28,9 @@ type pinType = {
 }
 
 type stateType = {
-  editingServer: boolean
   syncingNow: boolean
-  editingPin: boolean
   confirmingBiometric: boolean
-  editingRemote: boolean
   pulling: boolean
-  editingPull: boolean
   applyingPull: boolean
 }
 
@@ -60,13 +57,6 @@ function formatServerDisplay(value: string) {
   const withoutScheme = trimmed.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
   return withoutScheme || trimmed
 }
-function convertStateObjectToText(state: stateType, pullPreview: BackupPullPreview | null) {
-  if (state.editingPull && pullPreview) return "pull"
-  if (state.editingRemote) return "remote"
-  if (state.editingPin) return "pin"
-  if (state.editingServer) return "server"
-  return null
-}
 
 function summarizeConflictDay(source: { note: string; data: Record<string, unknown> }) {
   return `${Object.keys(source.data ?? {}).length} tasks, ${source.note.trim() ? 'has' : 'no'} note`
@@ -88,29 +78,21 @@ export default function Settings() {
   const [accentColor, setAccentColorState] = useState(() => theme.settings.accent.get())
   const [status, setStatus] = useObjectState<statusType>({ template: 'idle', remoteCredentials: 'idle' })
   const [state, setState] = useObjectState<stateType>({
-    editingServer: false, syncingNow: false, editingPin: false, confirmingBiometric: false, editingRemote: false, pulling: false, editingPull: false, applyingPull: false
+    syncingNow: false, confirmingBiometric: false, pulling: false, applyingPull: false
   })
+  const [activePopup, setActivePopup] = useState<SettingsPopupKey>(null)
   const [pin, setPin, resetPin] = useObjectState<pinType>({ current: "", draft: "", confirm: "" })
   const [serverCredentials, setServerCredentials, resetServerCredentials] = useObjectState<serverCredentials>({ password: "", passwordConfirm: "", currentServerPassword: "", })
   const [pull, setPull, resetPull] = useObjectState<pullItems>({ preview: null, choices: {}, accomplishmentChoice: "" })
-  const activePopup: SettingsPopupKey = convertStateObjectToText(state, pull.preview)
 
   useEffect(() => {
     if (activePopup) return registerCloseOnBack(() => {
-      switch (activePopup) {
-        case "pull":
-          setState({ editingPull: false, applyingPull: false })
-          resetPull()
-          setErrors({ backupPull: null })
-          return
-        case "remote":
-          setState({ editingRemote: false })
-          return
-        case "pin":
-          setState({ editingPin: false })
-          return
+      if (activePopup === 'pull') {
+        setState({ applyingPull: false })
+        resetPull()
+        setErrors({ backupPull: null })
       }
-      setState({ editingServer: false })
+      setActivePopup(null)
     })
   }, [activePopup, resetPull, setErrors, setState])
 
@@ -140,13 +122,13 @@ export default function Settings() {
   const handleEditApiBase = () => {
     setServerDraft(apiBaseUrl)
     setErrors({ server: null })
-    setState({ editingServer: true, editingRemote: false })
+    setActivePopup('server')
   }
 
   const handleSaveServerEdit = (event: FormEvent) => {
     event.preventDefault()
     setApiBaseUrlState(api.config.baseUrl.set(serverDraft))
-    setState({ editingServer: false })
+    setActivePopup(null)
   }
 
   const handleToggleBackup = () => {
@@ -165,7 +147,8 @@ export default function Settings() {
   }
 
   const closePullModal = () => {
-    setState({ editingPull: false, applyingPull: false })
+    setActivePopup(null)
+    setState({ applyingPull: false })
     resetPull()
     setErrors({ backupPull: null })
   }
@@ -182,7 +165,7 @@ export default function Settings() {
       const nextChoices: Record<string, BackupConflictChoice | ''> = {}
       for (const conflict of preview.conflicts) nextChoices[conflict.date] = ''
       setPull({ preview, choices: nextChoices, accomplishmentChoice: "" })
-      setState({ editingPull: true })
+      setActivePopup('pull')
     }
     catch (err) { setErrors({ backupPull: err instanceof Error ? err.message : 'Failed to fetch server snapshot.' }) }
     finally { setState({ pulling: false }) }
@@ -219,7 +202,7 @@ export default function Settings() {
   const handleEditPin = () => {
     resetPin()
     setErrors({ pin: null })
-    setState({ editingPin: true })
+    setActivePopup('pin')
   }
 
   const handleEditRemoteCredentials = () => {
@@ -230,7 +213,7 @@ export default function Settings() {
     resetServerCredentials()
     setErrors({ remoteCredentials: null })
     setStatus({ remoteCredentials: "idle" })
-    setState({ editingRemote: true, editingServer: false })
+    setActivePopup('remote')
   }
 
   const handleSaveRemoteCredentials = async (event: FormEvent) => {
@@ -260,7 +243,7 @@ export default function Settings() {
     try {
       await api.auth.updateRemoteCredentials(currentPassword, password)
       setStatus({ remoteCredentials: "saved" })
-      setState({ editingRemote: false })
+      setActivePopup(null)
     }
     catch (err) {
       setErrors({ remoteCredentials: err instanceof Error ? err.message : 'Failed to update credentials.' })
@@ -283,7 +266,7 @@ export default function Settings() {
       setErrors({ pin: "PINs do not match." })
       return
     }
-    setState({ editingPin: false })
+    setActivePopup(null)
     setDevicePin(normalized)
   }
 
@@ -349,14 +332,12 @@ export default function Settings() {
               />
               <span className="themeColorValue">{accentColor.toUpperCase()}</span>
             </label>
-            <button
-              className="stateButton stateButtonSecondary panelInlineButton"
-              type="button"
+            <Button.secondaryInline
               onClick={() => confirm("Do you really want to reset your color?") && setAccentColorState(theme.settings.accent.reset())}
               disabled={accentColor === DEFAULT_ACCENT_COLOR}
             >
               Reset
-            </button>
+            </Button.secondaryInline>
           </span>
         </div>
       </div>
@@ -412,37 +393,25 @@ export default function Settings() {
             <span className="panelRowValueServerText" title={apiBaseUrl}>
               {formatServerDisplay(apiBaseUrl)}
             </span>
-            <button className="stateButton stateButtonSecondary panelInlineButton" type="button" onClick={handleEditApiBase}>
+            <Button.secondaryInline onClick={handleEditApiBase}>
               Edit
-            </button>
+            </Button.secondaryInline>
           </span>
         </div>
         <div className="panelRow">
           <span>Remote credentials</span>
           <span className="panelRowValue">
             {remoteSessionConnected ? 'Connected' : 'Sign in required'}
-            <button
-              className="stateButton stateButtonSecondary panelInlineButton"
-              type="button"
-              onClick={handleEditRemoteCredentials}
-            >
+            <Button.secondaryInline onClick={handleEditRemoteCredentials}>
               Change
-            </button>
+            </Button.secondaryInline>
           </span>
         </div>
         <div className="panelRow">
           <span>Auto sync</span>
           <span className="panelRowValue panelRowValueToggle">
             {backup.enabled ? 'Enabled' : 'Disabled'}
-            <label className="toggleSwitch" aria-label="Toggle auto sync">
-              <input
-                className="toggleSwitchInput"
-                type="checkbox"
-                checked={backup.enabled}
-                onChange={handleToggleBackup}
-              />
-              <span className="toggleSwitchTrack" />
-            </label>
+            <ToggleSwitch ariaLabel="Toggle auto sync" checked={backup.enabled} onChange={handleToggleBackup} />
           </span>
         </div>
         <div className="panelRow panelRowTopAlign">
@@ -454,25 +423,23 @@ export default function Settings() {
             {backup.status.message && <p className="panelHint">({backup.status.message})</p>}
           </div>
           <span className="panelRowValue">
-            <button className="stateButton stateButtonSecondary panelInlineButton" type="button" onClick={handleSyncNow} disabled={state.syncingNow || !backup.enabled}>
+            <Button.secondaryInline onClick={handleSyncNow} disabled={state.syncingNow || !backup.enabled}>
               {state.syncingNow ? 'Syncing...' : 'Sync now'}
-            </button>
+            </Button.secondaryInline>
           </span>
         </div>
         <div className="panelRow">
           <span>Pull from server</span>
           <span className="panelRowValue">
-            <button
-              className="stateButton stateButtonSecondary panelInlineButton"
-              type="button"
+            <Button.secondaryInline
               onClick={handlePreparePull}
               disabled={state.pulling || state.applyingPull}
             >
               {state.pulling ? 'Checking...' : 'Pull'}
-            </button>
+            </Button.secondaryInline>
           </span>
         </div>
-        {errors.backupPull && activePopup !== 'pull' && <div className="stateMeta stateMetaError">{errors.backupPull}</div>}
+        {activePopup !== 'pull' && errors.backupPull && <div className="stateMeta stateMetaError">{errors.backupPull}</div>}
       </div>
       <div className="panelSection">
         <h2 className="panelTitle">Security</h2>
@@ -480,29 +447,23 @@ export default function Settings() {
           <span>Device PIN</span>
           <span className="panelRowValue">
             {hasDevicePin ? 'Set' : 'Not set'}
-            <button className="stateButton stateButtonSecondary panelInlineButton" type="button" onClick={handleEditPin}>
-              {hasDevicePin ? 'Change' : 'Set'}
-            </button>
+            <Button.secondaryInline onClick={handleEditPin}>{hasDevicePin ? 'Change' : 'Set'}</Button.secondaryInline>
           </span>
         </div>
         <div className="panelRow">
           <span>Biometric</span>
           <span className="panelRowValue panelRowValueToggle">
             {state.confirmingBiometric ? 'Confirming...' : biometricReady ? biometricAvailable ? (biometricEnabled ? 'Enabled' : 'Disabled') : 'Unavailable' : 'Checking...'}
-            {(!biometricReady || biometricAvailable) && <label className="toggleSwitch" aria-label="Toggle biometric unlock">
-              <input
-                className="toggleSwitchInput"
-                type="checkbox"
-                checked={biometricEnabled}
-                onChange={() => { void handleToggleBiometric() }}
-                disabled={!biometricReady || state.confirmingBiometric}
-              />
-              <span className="toggleSwitchTrack" />
-            </label>}
+            {(!biometricReady || biometricAvailable) && <ToggleSwitch
+              ariaLabel="Toggle biometric unlock"
+              checked={biometricEnabled}
+              onChange={() => { void handleToggleBiometric() }}
+              disabled={!biometricReady || state.confirmingBiometric}
+            />}
           </span>
         </div>
         {errors.biometric && <div className="stateMeta stateMetaError">{errors.biometric}</div>}
-        <button className="stateButton" onClick={() => lock()}>Lock now</button>
+        <Button.primary onClick={() => lock()}>Lock now</Button.primary>
       </div>
       <div className="panelSection">
         <h2 className="panelTitle">Notes</h2>
@@ -510,15 +471,11 @@ export default function Settings() {
           <span>Color note headings</span>
           <span className="panelRowValue panelRowValueToggle">
             {colorNoteHeadings ? 'Enabled' : 'Disabled'}
-            <label className="toggleSwitch" aria-label="Toggle note heading colors">
-              <input
-                className="toggleSwitchInput"
-                type="checkbox"
-                checked={colorNoteHeadings}
-                onChange={() => setColorNoteHeadingsState(setNoteHeaderColors(!colorNoteHeadings))}
-              />
-              <span className="toggleSwitchTrack" />
-            </label>
+            <ToggleSwitch
+              ariaLabel="Toggle note heading colors"
+              checked={colorNoteHeadings}
+              onChange={() => setColorNoteHeadingsState(setNoteHeaderColors(!colorNoteHeadings))}
+            />
           </span>
         </div>
         <label className="panelLabel" htmlFor="note-template">Default note style</label>
@@ -531,17 +488,12 @@ export default function Settings() {
           onChange={value => { setNoteTemplateState(value); setStatus({ template: "idle" }) }}
         />
         <div className="editorActions">
-          <button className="stateButton" type="button" onClick={async () => await saveTemplateValue(noteTemplate)} disabled={status.template === 'saving'}>
+          <Button.primary onClick={async () => await saveTemplateValue(noteTemplate)} disabled={status.template === 'saving'}>
             {status.template === 'saving' ? 'Saving...' : 'Save template'}
-          </button>
-          <button
-            className="stateButton stateButtonSecondary"
-            type="button"
-            onClick={handleClearTemplate}
-            disabled={status.template === 'saving'}
-          >
+          </Button.primary>
+          <Button.secondary onClick={handleClearTemplate} disabled={status.template === 'saving'}>
             Clear
-          </button>
+          </Button.secondary>
           {status.template === 'saved' && <span className="editorStatus editorStatusSuccess">Saved.</span>}
           {errors.template && <span className="editorStatus editorStatusError">{errors.template}</span>}
         </div>
@@ -554,7 +506,7 @@ export default function Settings() {
         error: errors.server,
         onDraftChange: value => { setServerDraft(value); setErrors({ server: null }) },
         onSave: handleSaveServerEdit,
-        onClose: () => setState({ editingServer: false }),
+        onClose: () => setActivePopup(null),
       }}
       pin={{
         hasDevicePin,
@@ -562,7 +514,7 @@ export default function Settings() {
         error: errors.pin,
         onChange: (field, value) => { setPin({ [field]: value } as Partial<pinType>); setErrors({ pin: null }) },
         onSave: handleSavePin,
-        onClose: () => setState({ editingPin: false }),
+        onClose: () => setActivePopup(null),
       }}
       remote={{
         values: serverCredentials,
@@ -570,7 +522,7 @@ export default function Settings() {
         error: errors.remoteCredentials,
         onChange: (field, value) => { setServerCredentials({ [field]: value } as Partial<serverCredentials>); setErrors({ remoteCredentials: null }) },
         onSave: handleSaveRemoteCredentials,
-        onClose: () => setState({ editingRemote: false }),
+        onClose: () => setActivePopup(null),
       }}
       pull={pull.preview && {
         values: {
