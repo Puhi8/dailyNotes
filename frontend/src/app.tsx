@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core'
 import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
@@ -70,29 +71,58 @@ function PrivacyScreen() {
   }, [])
 
   useEffect(() => {
-    if (isNativePlatform || !privacyBlurEnabled) {
+    if (!privacyBlurEnabled) {
       setIsPrivate(false)
       return
     }
+    let isActive = true
+    let nativeAppActive = true
+    const nativeListenerHandles: PluginListenerHandle[] = []
     const isLockScreenVisible = () => (
       document.documentElement.classList.contains('lockScreenActive') ||
       Boolean(document.querySelector('.state-locked'))
     )
-    const updatePrivacy = () => {
+    const updatePrivacy = (overrideNativeAppActive = nativeAppActive) => {
+      if (!isActive) return
       if (!readPrivacyBlurEnabled()) {
         setPrivacyBlurEnabled(false)
         setIsPrivate(false)
         return
       }
-      const shouldProtect = document.visibilityState !== 'visible' || !document.hasFocus()
+      const shouldProtect = isNativePlatform
+        ? !overrideNativeAppActive
+        : document.visibilityState !== 'visible' || !document.hasFocus()
       setIsPrivate(shouldProtect && !isLockScreenVisible())
     }
+    const setNativeAppActive = (nextValue: boolean) => {
+      nativeAppActive = nextValue
+      updatePrivacy(nextValue)
+    }
+    const attachNativeListener = (listenerPromise: Promise<PluginListenerHandle>) => {
+      void listenerPromise.then(handle => {
+        if (!isActive) {
+          void handle.remove()
+          return
+        }
+        nativeListenerHandles.push(handle)
+      })
+    }
     updatePrivacy()
-    const removeWindowListeners = eventListener.window(PRIVACY_FOCUS_EVENTS, updatePrivacy)
-    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacy)
+    const removeWindowListeners = isNativePlatform ? () => { } : eventListener.window(PRIVACY_FOCUS_EVENTS, () => { updatePrivacy() })
+    const removeDocumentListeners = isNativePlatform ? () => { } : eventListener.document(['visibilitychange'], () => { updatePrivacy() })
+    if (isNativePlatform) {
+      void CapacitorApp.getState()
+        .then(({ isActive: nextIsActive }) => { if (isActive) setNativeAppActive(nextIsActive) })
+        .catch(() => { if (isActive) updatePrivacy() })
+      attachNativeListener(CapacitorApp.addListener('pause', () => { setNativeAppActive(false) }))
+      attachNativeListener(CapacitorApp.addListener('resume', () => { setNativeAppActive(true) }))
+      attachNativeListener(CapacitorApp.addListener('appStateChange', ({ isActive: nextIsActive }) => { setNativeAppActive(nextIsActive) }))
+    }
     return () => {
+      isActive = false
       removeWindowListeners()
       removeDocumentListeners()
+      nativeListenerHandles.forEach(handle => { void handle.remove() })
     }
   }, [privacyBlurEnabled])
 
