@@ -11,7 +11,9 @@ declare global {
     DailyNotesPrivacy?: {
       setEnabled?: (enabled: boolean) => void
       setLockScreenActive?: (active: boolean) => void
+      prepareForExit?: () => void
     }
+    __dailyNotesPrivacySkipUntil?: number
   }
 }
 

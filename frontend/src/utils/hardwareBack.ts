@@ -112,7 +112,13 @@ export function useAndroidBackButton() {
         return
       }
       if (currentLocation.pathname === ROOT_PATH) {
-        console.debug('[android-back] ignored on root')
+        if (typeof window !== 'undefined') {
+          window.__dailyNotesPrivacySkipUntil = Date.now() + 1500
+          document.documentElement.classList.remove('privacyActive')
+          window.DailyNotesPrivacy?.prepareForExit?.()
+        }
+        console.debug('[android-back] exiting app on root')
+        void CapacitorApp.exitApp()
         return
       }
       if (historyIndex > 0 || canGoBack) {

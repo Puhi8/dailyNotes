@@ -22,6 +22,7 @@ const routerBasename = (() => {
 })()
 
 const isNativePlatform = Capacitor.isNativePlatform()
+const isNativeAndroidPlatform = isNativePlatform && Capacitor.getPlatform() === 'android'
 const shouldUseHashRouter = (!isNativePlatform && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
 const DEV_PRIVACY_KEY = 'DEV'
 const PRIVACY_DEV_EVENTS = ['storage', 'blur', 'focus'] as const
@@ -33,9 +34,15 @@ const readPrivacyBlurEnabled = () => {
   catch { return true }
 }
 
+const shouldSkipPrivacyForExit = () => (
+  typeof window !== 'undefined' &&
+  Number(window.__dailyNotesPrivacySkipUntil ?? 0) > Date.now()
+)
+
 export default () => (
   <AuthProvider>
     <SecurityProvider>
+      <PlatformClassBridge />
       <PrivacyScreen />
       {shouldUseHashRouter
         ? <HashRouter>
@@ -49,6 +56,14 @@ export default () => (
     </SecurityProvider>
   </AuthProvider>
 )
+
+function PlatformClassBridge() {
+  useEffect(() => {
+    document.documentElement.classList.toggle('platform-android', isNativeAndroidPlatform)
+    return () => document.documentElement.classList.remove('platform-android')
+  }, [])
+  return null
+}
 
 function PrivacyScreen() {
   const [isPrivate, setIsPrivate] = useState(false)
@@ -84,6 +99,10 @@ function PrivacyScreen() {
     )
     const updatePrivacy = (overrideNativeAppActive = nativeAppActive) => {
       if (!isActive) return
+      if (shouldSkipPrivacyForExit()) {
+        setIsPrivate(false)
+        return
+      }
       if (!readPrivacyBlurEnabled()) {
         setPrivacyBlurEnabled(false)
         setIsPrivate(false)
@@ -131,8 +150,8 @@ function PrivacyScreen() {
     document.documentElement.classList.toggle('privacyActive', showPrivacy)
     return () => document.documentElement.classList.remove('privacyActive')
   }, [showPrivacy])
-  if (isNativePlatform || !showPrivacy) return null
-  return <div className="privacyScreen" aria-hidden="true" />
+  if (isNativeAndroidPlatform || !showPrivacy) return null
+  return showPrivacy ? <div className="privacyScreen" aria-hidden="true" /> : null
 }
 
 type LockedRoute = {

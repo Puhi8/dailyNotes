@@ -38,21 +38,9 @@ public class MainActivity extends BridgeActivity {
   }
 
   @Override
-  public void onStop() {
-    privacy(true);
-    super.onStop();
-  }
-
-  @Override
   public void onResume() {
     super.onResume();
     privacy(false);
-  }
-
-  @Override
-  protected void onUserLeaveHint() {
-    privacy(true);
-    super.onUserLeaveHint();
   }
 
   @Override
