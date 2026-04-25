@@ -123,6 +123,8 @@ resolve_apksigner() {
   printf '%s\n' "$apksigner"
 }
 
+rm -f "$ANDROID_SIGNED_APK_PATH"
+
 JAVA_HOME="$(resolve_android_java_home)"
 ANDROID_SDK_HOME="$(resolve_android_sdk_home)"
 export JAVA_HOME
@@ -161,7 +163,6 @@ write_android_local_properties "$ANDROID_SDK_HOME"
 [[ -f "$ANDROID_UNSIGNED_APK_PATH" ]] || die "APK not found: $ANDROID_UNSIGNED_APK_PATH"
 
 mkdir -p "$(dirname "$ANDROID_SIGNED_APK_PATH")"
-rm -f "$ANDROID_SIGNED_APK_PATH"
 "$apksigner" sign \
   --ks "$ANDROID_KEYSTORE_PATH" \
   --ks-key-alias "$ANDROID_KEY_ALIAS" \
