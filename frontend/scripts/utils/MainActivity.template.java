@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
   private View privacyOverlay;
   private volatile boolean privacyEnabled = true;
   private volatile boolean lockScreenActive;
+  private volatile boolean finishingForExit;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -28,24 +29,36 @@ public class MainActivity extends BridgeActivity {
         lockScreenActive = active;
         if (active) runOnUiThread(() -> privacy(false));
       }
+
+      @JavascriptInterface
+      public void prepareForExit() {
+        finishingForExit = true;
+        runOnUiThread(() -> privacy(false));
+      }
     }, "DailyNotesPrivacy");
   }
 
   @Override
   public void onPause() {
-    privacy(true);
+    if (finishingForExit || isFinishing()) privacy(false);
+    else privacy(true);
     super.onPause();
   }
 
   @Override
   public void onResume() {
     super.onResume();
+    finishingForExit = false;
     privacy(false);
   }
 
   @Override
   public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
+    if (finishingForExit || isFinishing() || isDestroyed()) {
+      privacy(false);
+      return;
+    }
     privacy(!hasFocus);
   }
 
