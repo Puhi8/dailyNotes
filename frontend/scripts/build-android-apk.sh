@@ -32,6 +32,16 @@ die() {
   exit 1
 }
 
+remove_android_project_dir() {
+  [[ -n "$ANDROID_DIR" ]] || die "ANDROID_DIR is empty"
+  [[ "$ANDROID_DIR" != "/" ]] || die "Refusing to remove the filesystem root"
+
+  if [[ -d "$ANDROID_DIR" ]]; then
+    echo "Removing generated Android project: $ANDROID_DIR"
+    rm -rf "$ANDROID_DIR"
+  fi
+}
+
 java_major_version() {
   local java_home="$1"
   local version
@@ -149,6 +159,7 @@ else
   echo "Building Android APK version $ANDROID_VERSION_NAME ($ANDROID_VERSION_CODE)..."
 fi
 
+remove_android_project_dir
 "$PREPARE_ANDROID_PROJECT"
 
 [[ -f "$ANDROID_DIR/gradlew" ]] || die "No Gradle wrapper found at $ANDROID_DIR/gradlew"
