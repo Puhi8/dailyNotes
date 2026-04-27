@@ -1,9 +1,7 @@
 import type { FormEvent, ReactNode } from 'react'
-import type { BackupAccomplishmentChoice, BackupConflictChoice, BackupPullPreview } from '../data/api'
-import type { StatusOptions } from '../data/types'
-import { Button, LockInput, ModalShell } from '../utils/simplifyReact'
-
-export type SettingsPopupKey = 'server' | 'pin' | 'remote' | 'pull' | null
+import type { BackupAccomplishmentChoice, BackupConflictChoice, BackupPullPreview } from '../../data/api'
+import type { StatusOptions } from '../../data/types'
+import { Button, LockInput, ModalShell } from '../../utils/simplifyReact'
 
 type PinValues = {
   current: string
@@ -62,14 +60,6 @@ type PullPopupConfig = {
   summarizeConflictDay: (source: { note: string; data: Record<string, unknown> }) => string
 }
 
-type SettingsPopupManagerProps = {
-  activePopup: SettingsPopupKey
-  server: ServerPopupConfig
-  pin: PinPopupConfig
-  remote: RemotePopupConfig
-  pull: PullPopupConfig | null
-}
-
 type SettingsFormPopupProps = {
   children: ReactNode
   description: string
@@ -97,7 +87,7 @@ const SettingsFormPopup = ({ children, description, error, onClose, onSave, save
   </ModalShell>
 )
 
-const ServerPopup = ({ draft, error, onDraftChange, onSave, onClose }: ServerPopupConfig) => (
+export const ServerPopup = ({ draft, error, onDraftChange, onSave, onClose }: ServerPopupConfig) => (
   <SettingsFormPopup
     titleId="server-edit-title"
     title="Server address"
@@ -114,7 +104,7 @@ const ServerPopup = ({ draft, error, onDraftChange, onSave, onClose }: ServerPop
   </SettingsFormPopup>
 )
 
-const PinPopup = ({ hasDevicePin, values, error, onChange, onSave, onClose }: PinPopupConfig) => (
+export const PinPopup = ({ hasDevicePin, values, error, onChange, onSave, onClose }: PinPopupConfig) => (
   <SettingsFormPopup
     titleId="pin-edit-title"
     title="Device PIN"
@@ -144,7 +134,7 @@ const PinPopup = ({ hasDevicePin, values, error, onChange, onSave, onClose }: Pi
   </SettingsFormPopup>
 )
 
-const RemoteCredentialsPopup = ({ values, status, error, onChange, onSave, onClose }: RemotePopupConfig) => (
+export const RemoteCredentialsPopup = ({ values, status, error, onChange, onSave, onClose }: RemotePopupConfig) => (
   <SettingsFormPopup
     titleId="remote-credentials-title"
     title="Remote credentials"
@@ -177,7 +167,7 @@ const RemoteCredentialsPopup = ({ values, status, error, onChange, onSave, onClo
   </SettingsFormPopup>
 )
 
-function PullPopup({
+export function PullPopup({
   values,
   unresolvedConflicts,
   unresolvedAccomplishmentChoice,
@@ -246,12 +236,4 @@ function PullPopup({
       <Button.secondary onClick={onClose}>Go back</Button.secondary>
     </div>
   </ModalShell>
-}
-
-export default function SettingsPopupManager({ activePopup, server, pin, remote, pull }: SettingsPopupManagerProps) {
-  if (activePopup === 'server') return <ServerPopup {...server} />
-  if (activePopup === 'pin') return <PinPopup {...pin} />
-  if (activePopup === 'remote') return <RemoteCredentialsPopup {...remote} />
-  if (activePopup === 'pull' && pull) return <PullPopup {...pull} />
-  return null
 }

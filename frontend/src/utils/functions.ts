@@ -13,11 +13,11 @@ export function toUpperCase(string: string) {
 }
 
 export const eventListener = {
-  window: (events: readonly (keyof WindowEventMap)[], listener: EventListener) => {
+  window: (events: readonly string[], listener: EventListener) => {
     events.forEach(event => window.addEventListener(event, listener))
     return () => events.forEach(event => window.removeEventListener(event, listener))
   },
-  document: (events: readonly (keyof DocumentEventMap)[], listener: EventListener) => {
+  document: (events: readonly string[], listener: EventListener) => {
     events.forEach(event => document.addEventListener(event, listener))
     return () => events.forEach(event => document.removeEventListener(event, listener))
   },

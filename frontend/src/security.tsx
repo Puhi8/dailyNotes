@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NativeBiometric } from '@capgo/capacitor-native-biometric'
+import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { manageLocalStorage } from './utils/localProcessing'
-import { useObjectState } from './utils/functions'
+import { eventListener, useObjectState } from './utils/functions'
 import { Button, LockInput } from './utils/simplifyReact'
+import { useSecurityReauthSettings, type SecurityReauthSetting } from './data/securitySettings'
 
 declare global {
   interface Window {
@@ -18,6 +20,12 @@ declare global {
 }
 
 type UnlockScope = 'home' | 'app'
+
+const canPromptForAuth = () => {
+  if (typeof document === 'undefined') return true
+  if (document.visibilityState !== 'visible') return false
+  return Capacitor.isNativePlatform() || document.hasFocus()
+}
 
 type SecurityContextValue = {
   isUnlocked: boolean
@@ -50,8 +58,10 @@ const configuredPin = String(import.meta.env.VITE_SECURE_PIN || '').trim().repla
 
 export function SecurityProvider({ children }: { children: ReactNode }) {
   const isNative = Capacitor.isNativePlatform()
+  const { focus: requireBackInFocusUnlock } = useSecurityReauthSettings()
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [isHomeUnlocked, setIsHomeUnlocked] = useState(false)
+  const biometricPromptActive = useRef(false)
   const [biometric, setBiometric] = useObjectState<{ available: boolean; enabled: boolean; ready: boolean }>({
     available: false, enabled: manageLocalStorage.get(BIOMETRIC_ENABLED_KEY, null) === "1", ready: !isNative
   })
@@ -88,10 +98,12 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
       if (!Capacitor.isNativePlatform()) return false
       const availability = await NativeBiometric.isAvailable()
       if (!availability?.isAvailable) return false
+      biometricPromptActive.current = true
       await NativeBiometric.verifyIdentity({ reason })
       return true
     }
     catch { return false }
+    finally { biometricPromptActive.current = false }
   }, [])
 
   const unlockWithBiometrics = useCallback(async (scope: UnlockScope = 'app') => {
@@ -131,6 +143,43 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     setIsUnlocked(false)
   }, [])
 
+  useEffect(() => {
+    if (!requireBackInFocusUnlock || !hasPin) return
+
+    let disposed = false
+    const nativeListenerRemovers: Array<() => void> = []
+    const lockEnterGate = () => {
+      if (disposed || biometricPromptActive.current) return
+      setIsHomeUnlocked(false)
+    }
+    const handleVisibilityChange = () => { if (document.visibilityState !== 'visible') lockEnterGate() }
+    const handleNativeAppStateChange = ({ isActive }: { isActive: boolean }) => { if (!isActive) lockEnterGate() }
+    const addNativeListener = (listenerPromise: Promise<{ remove: () => Promise<void> }>) => {
+      void listenerPromise
+        .then(handle => {
+          const remove = () => { void handle.remove() }
+          if (disposed) remove()
+          else nativeListenerRemovers.push(remove)
+        })
+        .catch(() => { })
+    }
+
+    const removeWindowListeners = eventListener.window(['blur', 'pagehide'], lockEnterGate)
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], handleVisibilityChange)
+
+    if (isNative) {
+      addNativeListener(CapacitorApp.addListener('pause', lockEnterGate))
+      addNativeListener(CapacitorApp.addListener('appStateChange', handleNativeAppStateChange))
+    }
+
+    return () => {
+      disposed = true
+      removeWindowListeners()
+      removeDocumentListeners()
+      nativeListenerRemovers.forEach(remove => remove())
+    }
+  }, [hasPin, isNative, requireBackInFocusUnlock])
+
   const value = useMemo(
     () => ({
       isUnlocked,
@@ -159,16 +208,14 @@ export function useSecurity() {
   return context
 }
 
-export function RequireUnlock({
-  children,
-  title = "Locked",
-  message = "Enter your PIN to access this page.",
+export function RequireUnlock({ children, title = "Locked", message = "Enter your PIN to access this page."
 }: { children: ReactNode, title?: string, message?: string }) {
   const { isUnlocked } = useSecurity()
   return <RequireReauth
     title={title}
     message={message}
     completed={isUnlocked}
+    reauthMoment="internal"
     unlockScope="app"
   >
     {children}
@@ -182,6 +229,10 @@ type RequireReauthProps = {
   completed?: boolean
   onVerified?: () => void
   unlockScope?: UnlockScope
+  reauthMoment?: SecurityReauthSetting
+  ignoreReauthSettings?: boolean
+  presentation?: 'page' | 'modal'
+  onCancel?: () => void
 }
 
 export function RequireReauth({
@@ -191,17 +242,27 @@ export function RequireReauth({
   completed,
   onVerified,
   unlockScope = 'app',
+  reauthMoment = 'internal',
+  ignoreReauthSettings = false,
+  presentation = 'page',
+  onCancel,
 }: RequireReauthProps) {
   const { hasPin, biometricAvailable, biometricReady, biometricEnabled, unlockWithPin, unlockWithBiometrics } = useSecurity()
+  const { internal: requireInternalMovementUnlock, focus: requireBackInFocusUnlock } = useSecurityReauthSettings()
   const navigate = useNavigate()
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [localConfirmed, setLocalConfirmed] = useState(false)
   const [biometricSettled, setBiometricSettled] = useState(false)
+  const [canPrompt, setCanPrompt] = useState(canPromptForAuth)
   const didFocusBiometric = useRef(false)
   const pinInputRef = useRef<HTMLInputElement | null>(null)
   const shouldTryBiometric = hasPin && biometricEnabled && biometricReady && biometricAvailable
   const isCompleted = completed ?? localConfirmed
+  const isRequirementDisabled = !ignoreReauthSettings && (
+    (reauthMoment === 'internal' && !requireInternalMovementUnlock) ||
+    (reauthMoment === 'focus' && !requireBackInFocusUnlock)
+  )
   const markVerified = useCallback(() => {
     setLocalConfirmed(true)
     onVerified?.()
@@ -233,8 +294,49 @@ export function RequireReauth({
   }
 
   useEffect(() => {
-    if (isCompleted) return
-    if (!biometricReady) {
+    let disposed = false
+    const nativeListenerRemovers: Array<() => void> = []
+    const syncCanPrompt = (nextValue = canPromptForAuth()) => { if (!disposed) setCanPrompt(nextValue) }
+    const addNativeListener = (listenerPromise: Promise<{ remove: () => Promise<void> }>) => {
+      void listenerPromise
+        .then(handle => {
+          const remove = () => { void handle.remove() }
+          if (disposed) remove()
+          else nativeListenerRemovers.push(remove)
+        })
+        .catch(() => { })
+    }
+
+    syncCanPrompt()
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], () => syncCanPrompt())
+    const removeWindowListeners = Capacitor.isNativePlatform()
+      ? () => { }
+      : eventListener.window(['blur', 'focus', 'pagehide'], () => syncCanPrompt())
+    if (Capacitor.isNativePlatform()) {
+      addNativeListener(CapacitorApp.addListener('pause', () => syncCanPrompt(false)))
+      addNativeListener(CapacitorApp.addListener('resume', () => syncCanPrompt(true)))
+      addNativeListener(CapacitorApp.addListener('appStateChange', ({ isActive }) => syncCanPrompt(isActive)))
+    }
+    return () => {
+      disposed = true
+      removeDocumentListeners()
+      removeWindowListeners()
+      nativeListenerRemovers.forEach(remove => remove())
+    }
+  }, [])
+
+  useEffect(() => {
+    didFocusBiometric.current = false
+    setBiometricSettled(false)
+    if (!isCompleted && !isRequirementDisabled) {
+      setError(null)
+      setPin('')
+    }
+  }, [isCompleted, isRequirementDisabled])
+
+  useEffect(() => {
+    if (isRequirementDisabled || isCompleted) return
+    if (!canPrompt || !biometricReady) {
       setBiometricSettled(false)
       return
     }
@@ -252,54 +354,59 @@ export function RequireReauth({
       })
       .finally(() => { if (active) setBiometricSettled(true) })
     return () => { active = false }
-  }, [biometricAvailable, biometricEnabled, biometricReady, hasPin, isCompleted, markVerified, unlockScope, unlockWithBiometrics])
+  }, [biometricAvailable, biometricEnabled, biometricReady, canPrompt, hasPin, isCompleted, isRequirementDisabled, markVerified, unlockScope, unlockWithBiometrics])
 
   useEffect(() => {
-    if (isCompleted || !hasPin || !biometricSettled) return
+    if (isRequirementDisabled || isCompleted || !hasPin || !biometricSettled) return
     pinInputRef.current?.focus()
-  }, [biometricSettled, hasPin, isCompleted])
+  }, [biometricSettled, hasPin, isCompleted, isRequirementDisabled])
 
   useEffect(() => {
-    const isLockScreen = hasPin && !isCompleted
+    const isLockScreen = hasPin && !isCompleted && !isRequirementDisabled
     document.documentElement.classList.toggle('lockScreenActive', isLockScreen)
     window.DailyNotesPrivacy?.setLockScreenActive?.(isLockScreen)
     return () => {
       document.documentElement.classList.remove('lockScreenActive')
       window.DailyNotesPrivacy?.setLockScreenActive?.(false)
     }
-  }, [hasPin, isCompleted])
+  }, [hasPin, isCompleted, isRequirementDisabled])
 
-  if (!hasPin || isCompleted) return <>{children}</>
+  if (!hasPin || isCompleted || isRequirementDisabled) return <>{children}</>
 
-  return <div className="state state-locked">
-    <div className="stateCard">
-      <h2>{title}</h2>
-      <p>{message}</p>
-      {!hasPin
-        ? <div className="stateMeta">PIN not configured.</div>
-        : <form className="lockForm" onSubmit={handleSubmit}>
-          <LockInput.pin
-            ref={pinInputRef}
-            placeholder="PIN"
-            value={pin}
-            onChange={event => setPin(event.target.value)}
-            onFocus={handlePinFocus}
-            autoComplete="one-time-code"
-          />
-          <div className="lockActions">
-            <Button.primary type="submit">Unlock</Button.primary>
-            {biometricAvailable && biometricEnabled && <Button.secondary onClick={handleBiometric}>
-              Use fingerprint
-            </Button.secondary>
-            }
-            <Button.secondary onClick={() => navigate("/")}>Go back</Button.secondary>
-          </div>
-        </form>
-      }
-      {!hasPin && <div className="lockActions">
-        <Button.secondary onClick={() => navigate("/")}>Go back</Button.secondary>
-      </div>}
-      {error && <div className="stateMeta stateMetaError">{error}</div>}
-    </div>
+  const handleCancel = () => {
+    if (onCancel) { onCancel(); return }
+    navigate("/")
+  }
+
+  const lockCard = <div className={presentation === 'modal' ? 'stateCard modalCard' : 'stateCard'}>
+    <h2>{title}</h2>
+    <p>{message}</p>
+    {!hasPin
+      ? <div className="stateMeta">PIN not configured.</div>
+      : <form className="lockForm" onSubmit={handleSubmit}>
+        <LockInput.pin
+          ref={pinInputRef}
+          placeholder="PIN"
+          value={pin}
+          onChange={event => setPin(event.target.value)}
+          onFocus={handlePinFocus}
+          autoComplete="one-time-code"
+        />
+        <div className="lockActions">
+          <Button.primary type="submit">Unlock</Button.primary>
+          {biometricAvailable && biometricEnabled && <Button.secondary onClick={handleBiometric}>
+            Use fingerprint
+          </Button.secondary>
+          }
+          <Button.secondary onClick={handleCancel}>{onCancel ? 'Cancel' : 'Go back'}</Button.secondary>
+        </div>
+      </form>
+    }
+    {!hasPin && <div className="lockActions">
+      <Button.secondary onClick={handleCancel}>{onCancel ? 'Cancel' : 'Go back'}</Button.secondary>
+    </div>}
+    {error && <div className="stateMeta stateMetaError">{error}</div>}
   </div>
+  if (presentation === 'modal') return <div className="modalBackdrop" role="presentation">{lockCard}</div>
+  return <div className="state state-locked">{lockCard}</div>
 }
