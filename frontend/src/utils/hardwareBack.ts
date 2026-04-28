@@ -71,11 +71,6 @@ export function registerCloseOnBack(
 
 const ROOT_PATH = '/'
 const isNativeAndroidPlatform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
-function getHistoryIndex() {
-  if (typeof window === 'undefined') return 0
-  const historyState = window.history.state as { idx?: unknown } | null
-  return typeof historyState?.idx === 'number' ? historyState.idx : 0
-}
 
 function resolveFallbackPath(pathname: string, state: unknown) {
   if (pathname === ROOT_PATH) return null
@@ -99,10 +94,10 @@ export function useAndroidBackButton() {
     console.debug('[android-back] attaching listener')
     const handleBack = ({ canGoBack }: BackButtonListenerEvent) => {
       const currentLocation = locationRef.current
-      const historyIndex = getHistoryIndex()
+      const fallbackPath = resolveFallbackPath(currentLocation.pathname, currentLocation.state)
       console.debug('[android-back] backButton event', {
         canGoBack,
-        historyIndex,
+        fallbackPath,
         pathname: currentLocation.pathname,
       })
 
@@ -121,19 +116,13 @@ export function useAndroidBackButton() {
         void CapacitorApp.exitApp()
         return
       }
-      if (historyIndex > 0 || canGoBack) {
-        console.debug('[android-back] navigated back')
-        navigate(-1)
-        return
-      }
-
-      const fallbackPath = resolveFallbackPath(currentLocation.pathname, currentLocation.state)
       if (fallbackPath && fallbackPath !== currentLocation.pathname) {
-        console.debug('[android-back] navigated back', { fallbackPath })
+        console.debug('[android-back] navigated by route map', { fallbackPath })
         navigate(fallbackPath, { replace: true })
         return
       }
-      console.debug('[android-back] ignored on root')
+      console.debug('[android-back] exiting app without mapped route')
+      void CapacitorApp.exitApp()
     }
 
     void CapacitorApp.addListener('backButton', handleBack).then(handle => {

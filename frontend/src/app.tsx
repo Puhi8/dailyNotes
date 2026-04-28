@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { App as CapacitorApp } from '@capacitor/app'
-import { Capacitor, type PluginListenerHandle } from '@capacitor/core'
+import { Capacitor } from '@capacitor/core'
 import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
 import StartupGate from './components/StartupGate'
 import { useAndroidBackButton } from './utils/hardwareBack'
 import { eventListener } from './utils/functions'
+import { getAndroidPrivacyModeEnabled, PRIVACY_SETTINGS_CHANGED_EVENT } from './data/privacy'
 
 const Login = lazy(() => import('./pages/Login'))
 const Home = lazy(() => import('./home'))
@@ -22,10 +22,11 @@ const routerBasename = (() => {
 })()
 
 const isNativePlatform = Capacitor.isNativePlatform()
+const isWebPlatform = !isNativePlatform
 const isNativeAndroidPlatform = isNativePlatform && Capacitor.getPlatform() === 'android'
 const shouldUseHashRouter = (!isNativePlatform && import.meta.env.PROD && import.meta.env.VITE_ROUTER_MODE === 'hash')
 const DEV_PRIVACY_KEY = 'DEV'
-const PRIVACY_DEV_EVENTS = ['storage', 'blur', 'focus'] as const
+const PRIVACY_DEV_EVENTS = ['storage', 'blur', 'focus', PRIVACY_SETTINGS_CHANGED_EVENT] as const
 const PRIVACY_FOCUS_EVENTS = ['blur', 'focus'] as const
 
 const readPrivacyBlurEnabled = () => {
@@ -70,34 +71,33 @@ function PrivacyScreen() {
   const [privacyBlurEnabled, setPrivacyBlurEnabled] = useState(readPrivacyBlurEnabled)
 
   useEffect(() => {
-    const updatePrivacyBlurEnabled = () => {
+    const updatePrivacySettings = () => {
       const enabled = readPrivacyBlurEnabled()
       setPrivacyBlurEnabled(enabled)
-      window.DailyNotesPrivacy?.setEnabled?.(enabled)
+      if (isNativeAndroidPlatform) {
+        window.DailyNotesPrivacy?.setEnabled?.(getAndroidPrivacyModeEnabled())
+      }
     }
-    updatePrivacyBlurEnabled()
-    const removeWindowListeners = eventListener.window(PRIVACY_DEV_EVENTS, updatePrivacyBlurEnabled)
-    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacyBlurEnabled)
+    updatePrivacySettings()
+    const removeWindowListeners = eventListener.window(PRIVACY_DEV_EVENTS, updatePrivacySettings)
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacySettings)
     return () => {
       removeWindowListeners()
       removeDocumentListeners()
-      window.DailyNotesPrivacy?.setEnabled?.(true)
     }
   }, [])
 
   useEffect(() => {
-    if (!privacyBlurEnabled) {
+    if (!isWebPlatform || !privacyBlurEnabled) {
       setIsPrivate(false)
       return
     }
     let isActive = true
-    let nativeAppActive = true
-    const nativeListenerHandles: PluginListenerHandle[] = []
     const isLockScreenVisible = () => (
       document.documentElement.classList.contains('lockScreenActive') ||
       Boolean(document.querySelector('.state-locked'))
     )
-    const updatePrivacy = (overrideNativeAppActive = nativeAppActive) => {
+    const updatePrivacy = () => {
       if (!isActive) return
       if (shouldSkipPrivacyForExit()) {
         setIsPrivate(false)
@@ -108,49 +108,25 @@ function PrivacyScreen() {
         setIsPrivate(false)
         return
       }
-      const shouldProtect = isNativePlatform
-        ? !overrideNativeAppActive
-        : document.visibilityState !== 'visible' || !document.hasFocus()
+      const shouldProtect = document.visibilityState !== 'visible' || !document.hasFocus()
       setIsPrivate(shouldProtect && !isLockScreenVisible())
     }
-    const setNativeAppActive = (nextValue: boolean) => {
-      nativeAppActive = nextValue
-      updatePrivacy(nextValue)
-    }
-    const attachNativeListener = (listenerPromise: Promise<PluginListenerHandle>) => {
-      void listenerPromise.then(handle => {
-        if (!isActive) {
-          void handle.remove()
-          return
-        }
-        nativeListenerHandles.push(handle)
-      })
-    }
     updatePrivacy()
-    const removeWindowListeners = isNativePlatform ? () => { } : eventListener.window(PRIVACY_FOCUS_EVENTS, () => { updatePrivacy() })
-    const removeDocumentListeners = isNativePlatform ? () => { } : eventListener.document(['visibilitychange'], () => { updatePrivacy() })
-    if (isNativePlatform) {
-      void CapacitorApp.getState()
-        .then(({ isActive: nextIsActive }) => { if (isActive) setNativeAppActive(nextIsActive) })
-        .catch(() => { if (isActive) updatePrivacy() })
-      attachNativeListener(CapacitorApp.addListener('pause', () => { setNativeAppActive(false) }))
-      attachNativeListener(CapacitorApp.addListener('resume', () => { setNativeAppActive(true) }))
-      attachNativeListener(CapacitorApp.addListener('appStateChange', ({ isActive: nextIsActive }) => { setNativeAppActive(nextIsActive) }))
-    }
+    const removeWindowListeners = eventListener.window(PRIVACY_FOCUS_EVENTS, updatePrivacy)
+    const removeDocumentListeners = eventListener.document(['visibilitychange'], updatePrivacy)
     return () => {
       isActive = false
       removeWindowListeners()
       removeDocumentListeners()
-      nativeListenerHandles.forEach(handle => { void handle.remove() })
     }
   }, [privacyBlurEnabled])
 
-  const showPrivacy = privacyBlurEnabled && isPrivate
+  const showPrivacy = isWebPlatform && privacyBlurEnabled && isPrivate
   useEffect(() => {
     document.documentElement.classList.toggle('privacyActive', showPrivacy)
     return () => document.documentElement.classList.remove('privacyActive')
   }, [showPrivacy])
-  if (isNativeAndroidPlatform || !showPrivacy) return null
+  if (!showPrivacy) return null
   return showPrivacy ? <div className="privacyScreen" aria-hidden="true" /> : null
 }
 
@@ -200,17 +176,17 @@ function AppShell() {
           <Route path="/login" element={<Login />} />
           <Route
             path="/"
-            element={<RequireAuth><HomeGate /></RequireAuth>}
+            element={<ProtectedAppRoute><Home /></ProtectedAppRoute>}
           />
           {lockedRouts.map(item => (
             <Route
               key={item.path}
               path={item.path}
-              element={<RequireAuth>
+              element={<ProtectedAppRoute>
                 <RequireUnlock title={item.lockTitle} message={item.lockMessage}>
                   {item.item}
                 </RequireUnlock>
-              </RequireAuth>}
+              </ProtectedAppRoute>}
             />
           ))}
         </Routes>
@@ -224,15 +200,22 @@ function AndroidBackButtonBridge() {
   return null
 }
 
-function HomeGate() {
+function ProtectedAppRoute({ children }: { children: ReactNode }) {
+  return <RequireAuth>
+    <EnterGate>{children}</EnterGate>
+  </RequireAuth>
+}
+
+function EnterGate({ children }: { children: ReactNode }) {
   const { isHomeUnlocked } = useSecurity()
   return <RequireReauth
     title="Welcome back"
-    message="Confirm your fingerprint or PIN to open Home."
+    message="Confirm your fingerprint or PIN to continue."
     completed={isHomeUnlocked}
+    reauthMoment="focus"
     unlockScope="home"
   >
-    <Home />
+    {children}
   </RequireReauth>
 }
 
@@ -242,6 +225,7 @@ function NoteDetailGate() {
     key={date ?? 'note'}
     title="Confirm note access"
     message="Confirm your PIN or fingerprint to view this day note."
+    reauthMoment="internal"
   >
     <NoteDetail />
   </RequireReauth>
