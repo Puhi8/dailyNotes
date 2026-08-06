@@ -14,14 +14,8 @@ import {
   type NoteTemplateResponse,
   type IndividualDayResponse,
   dayKey,
+  normalizeDayKey,
 } from './localCore'
-import type { IndividualDay } from './types'
-
-type SaveResponseMap = {
-  '/yesterday': IndividualDayResponse
-  '/today': IndividualDayResponse
-  '/note-template': NoteTemplateResponse
-}
 
 export type SaveDayPayload = Partial<Pick<IndividualDayResponse, 'data' | 'note'>>
 
@@ -55,8 +49,7 @@ const toAccomplishmentItems = (state: LocalState): AccomplishmentItem[] => {
   return state.accomplishments.map(item => ({ ...item, used: used.has(item.name.toLowerCase()) }))
 }
 
-const saveDayPayload = async (state: LoadedLocalState, mode: IndividualDay, payload: SaveDayPayload) => {
-  const dateKey = dayKey.get(mode)
+const saveDayPayload = async (state: LoadedLocalState, dateKey: string, payload: SaveDayPayload) => {
   const nextData: DayData = {}
   const typeByName = new Map(
     state.accomplishments.map(item => [item.name.trim().toLowerCase(), normalizeAccomplishmentType(item.type)]),
@@ -84,21 +77,10 @@ export async function saveNoteTemplate(template: string): Promise<NoteTemplateRe
   })
 }
 
-export async function saveIndividualDay(day: IndividualDay, payload: SaveDayPayload): Promise<IndividualDayResponse> {
-  return withLocalStateWrite(async state => (await saveDayPayload(state, day, payload)))
-}
-
-export async function saveFetch<P extends keyof SaveResponseMap>(path: P, data: unknown): Promise<SaveResponseMap[P]> {
-  if (path === '/note-template') {
-    const template = (typeof data === 'object' && data && 'template' in data)
-      ? String((data as { template?: unknown }).template ?? '')
-      : ''
-    return await saveNoteTemplate(template) as SaveResponseMap[P]
-  }
-
-  const payload = (typeof data === 'object' && data ? data : {}) as SaveDayPayload
-  if (path === '/today') return await saveIndividualDay("today", payload) as SaveResponseMap[P]
-  return await saveIndividualDay("yesterday", payload) as SaveResponseMap[P]
+export async function saveIndividualDay(date: string, payload: SaveDayPayload): Promise<IndividualDayResponse> {
+  const dateKey = normalizeDayKey(date)
+  if (!dayKey.isEditable(dateKey)) throw new Error(`${dateKey} is closed for editing.`)
+  return withLocalStateWrite(async state => (await saveDayPayload(state, dateKey, payload)))
 }
 
 export async function createAccomplishment(name: string, type = ''): Promise<AccomplishmentItem> {

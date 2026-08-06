@@ -1,4 +1,4 @@
-import type { IndividualDay, ServerData } from './types'
+import type { ServerData } from './types'
 import {
   cloneDayData,
   compareDayKeys,
@@ -48,8 +48,7 @@ const buildDefaultDayDataForDate = (
   return cloneDayData(defaults)
 }
 
-const getDayPayload = (state: Awaited<ReturnType<typeof loadLocalState>>, mode: IndividualDay): IndividualDayResponse => {
-  const dateKey = dayKey.get(mode)
+const getDayPayload = (state: Awaited<ReturnType<typeof loadLocalState>>, dateKey: string): IndividualDayResponse => {
   const existing = state.days[dateKey]
   let data = cloneDayData(existing?.data ?? {})
   const note = existing?.note ?? ''
@@ -63,7 +62,7 @@ const getDayPayload = (state: Awaited<ReturnType<typeof loadLocalState>>, mode: 
     data[key] = normalizeDayValueForAccomplishmentType(value, expectedType)
   }
 
-  if (mode === 'today') {
+  if (dateKey === dayKey.today()) {
     const activeItems = state.accomplishments.filter(item => item.active)
     const activeNames = new Set(activeItems.map(item => item.name.trim()).filter(Boolean))
     const useActiveFilter = activeItems.length > 0
@@ -191,18 +190,9 @@ const buildServerData = (state: Awaited<ReturnType<typeof loadLocalState>>): Ser
   }
 }
 
-type ReadResponseMap = {
-  '/yesterday': IndividualDayResponse
-  '/today': IndividualDayResponse
-  '/data': ServerData
-  '/notes': NoteSummary[]
-  '/note-template': NoteTemplateResponse
-  '/accomplishments': AccomplishmentItem[]
-}
-
-export async function getIndividualDay(day: IndividualDay): Promise<IndividualDayResponse> {
+export async function getIndividualDay(date: string): Promise<IndividualDayResponse> {
   const state = await loadLocalState()
-  return getDayPayload(state, day)
+  return getDayPayload(state, normalizeDayKey(date))
 }
 
 export async function getDashboardData(): Promise<ServerData> {
@@ -236,16 +226,6 @@ export async function listAccomplishments(): Promise<AccomplishmentItem[]> {
     active: item.active,
     used: used.has(item.name.toLowerCase()),
   }))
-}
-
-export async function fetchData<P extends keyof ReadResponseMap>(path: P): Promise<ReadResponseMap[P]> {
-  if (path === '/today') return await getIndividualDay("today") as ReadResponseMap[P]
-  if (path === '/yesterday') return await getIndividualDay("yesterday") as ReadResponseMap[P]
-  if (path === '/data') return await getDashboardData() as ReadResponseMap[P]
-  if (path === '/notes') return await listNotes() as ReadResponseMap[P]
-  if (path === '/note-template') return await getNoteTemplate() as ReadResponseMap[P]
-  if (path === '/accomplishments') return await listAccomplishments() as ReadResponseMap[P]
-  throw new Error(`Unsupported path: ${path}`)
 }
 
 export async function fetchNote(date: string): Promise<NoteEntry> {

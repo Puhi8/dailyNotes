@@ -1,7 +1,6 @@
 import { makeDayKey } from '../utils/functions'
 import { getDeviceValue, setDeviceValue } from './deviceStore'
 import { isPersistentRuntime } from '../utils/localProcessing'
-import type { IndividualDay } from './types'
 
 const LOCAL_DATA_KEY = 'dailynotes.localData.v1'
 
@@ -247,6 +246,9 @@ export const normalizeDayValueForAccomplishmentType = (value: DayData[string], k
   return false
 }
 
+// Open editors keep their day writable past midnight. Held in memory, so closing the page or app revokes it.
+const openDayEdits = new Set<string>()
+
 export const dayKey = {
   make: makeDayKey,
   today: () => dayKey.make(new Date()),
@@ -255,7 +257,13 @@ export const dayKey = {
     date.setDate(date.getDate() - 1)
     return dayKey.make(date)
   },
-  get: (day: IndividualDay) => day === "today" ? dayKey.today() : dayKey.yesterday()
+  isEditable: (key: string) => key === dayKey.today() || key === dayKey.yesterday() || openDayEdits.has(key)
+}
+
+export const openDayEdit = (key: string) => {
+  if (!dayKey.isEditable(key)) return () => { }
+  openDayEdits.add(key)
+  return () => openDayEdits.delete(key)
 }
 
 export const ensureAccomplishmentExists = (state: LocalState, name: string, type: string, active = true) => {

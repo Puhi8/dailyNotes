@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import ErrorState from '../components/ErrorState'
 import MarkdownEditor from '../components/MarkdownEditor'
 import { api, type DayData } from '../data/api'
+import { dayKey, normalizeDayKey, openDayEdit, parseDayKey } from '../data/localCore'
 import { applyNoteTemplate, resolveNoteTemplate } from '../data/noteSettings'
-import type { IndividualDay, StatusOptions } from '../data/types'
-import { toUpperCase, useObjectState } from '../utils/functions'
+import type { StatusOptions } from '../data/types'
+import { useObjectState } from '../utils/functions'
 import { saveIndividualDay } from '../data/localWrite'
 
 const isSameData = (left: DayData, right: DayData) => {
@@ -29,8 +31,9 @@ type errorState = {
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 700
-export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
-  const [date, setDate] = useState('')
+export default function SingleDay() {
+  // Pinned by the URL, never read from the clock, so a session running past midnight stays on one day.
+  const date = normalizeDayKey(useParams().date ?? '')
   const [data, setData] = useObjectState<fetchedData<DayData>>({ main: {}, original: {} })
   const [note, setNote] = useObjectState<fetchedData<string>>({ main: "", original: "" })
   const [isLoading, setIsLoading] = useState(true)
@@ -46,14 +49,22 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
   const queuedSaveRef = useRef(false)
 
   useEffect(() => {
+    const rejection = !parseDayKey(date) ? `Invalid date: ${date}`
+      : !dayKey.isEditable(date) ? `${date} is closed for editing.`
+        : null
+    if (rejection) {
+      setErrors({ load: rejection })
+      setIsLoading(false)
+      return
+    }
+    const closeEditSession = openDayEdit(date)
     let cancelled = false
     setIsLoading(true)
     setErrors({ load: null })
-    Promise.all([api.day.getIndividual(dayType), api.accomplishments.list(), resolveNoteTemplate()])
+    Promise.all([api.day.getIndividual(date), api.accomplishments.list(), resolveNoteTemplate()])
       .then(([result, accomplishments, template]) => {
         if (cancelled) return
         const displayNote = applyNoteTemplate(result.note || '', String(template)).note
-        setDate(result.date)
         setData({ main: { ...result.data }, original: { ...result.data } })
         setNote({ main: displayNote, original: displayNote })
         setAccomplishmentOrder(accomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean))
@@ -65,12 +76,13 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => {
       cancelled = true
+      closeEditSession()
       if (saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
       }
     }
-  }, [dayType])
+  }, [date])
 
   useEffect(() => { dataRef.current = data.main }, [data.main])
   useEffect(() => { noteRef.current = note.main }, [note.main])
@@ -113,8 +125,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
     const dataToSave = dataRef.current
     const noteToSave = noteRef.current
     try {
-      const result = await saveIndividualDay(dayType, { data: dataToSave, note: noteToSave })
-      setDate(result.date)
+      await saveIndividualDay(date, { data: dataToSave, note: noteToSave })
       setData({ original: dataToSave })
       setNote({ original: noteToSave })
       setSaveStatus('saved')
@@ -131,7 +142,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         void handleSave()
       }
     }
-  }, [dayType])
+  }, [date])
 
   useEffect(() => {
     if (!isDirty) return
@@ -148,16 +159,16 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
     }
   }, [data.main, handleSave, isDirty, note.main])
 
-  if (isLoading) return <div className="state">Loading {dayType}...</div>
   if (errors.load) return <ErrorState error={errors.load} onReload={() => window.location.reload()} />
+  if (isLoading) return <div className="state">Loading {date}...</div>
 
   return <div className="page">
-    <header className="pageHeader"><h1>{toUpperCase(dayType)} ({date || dayType})</h1></header>
+    <header className="pageHeader"><h1>{date}</h1></header>
     <section className="panelCard panelStack">
       <div className="panelSection">
         <h2 className="panelTitle">Checklist</h2>
         {entries.length === 0
-          ? <div className="panelEmpty">No entries for {dayType}.</div>
+          ? <div className="panelEmpty">No entries for {date}.</div>
           : <div className="editorList"> {
             entries.map(([key, value]) => (
               <div className="editorRow" key={key}>
@@ -189,7 +200,7 @@ export default function SingleDay({ dayType }: { dayType: IndividualDay }) {
         <MarkdownEditor
           className="noteMarkdownEditor"
           value={note.main}
-          placeholder={`Write ${dayType}'s markdown note.`}
+          placeholder={`Write the markdown note for ${date}.`}
           onChange={handleNoteChange}
         />
       </div>

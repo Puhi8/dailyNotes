@@ -26,5 +26,3 @@ export type ServerData = {
 }
 
 export type StatusOptions = 'idle' | 'saving' | 'saved'
-
-export type IndividualDay = "today" | "yesterday"

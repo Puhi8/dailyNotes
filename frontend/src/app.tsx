@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { BrowserRouter, HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { BrowserRouter, HashRouter, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { RequireReauth, RequireUnlock, SecurityProvider, useSecurity } from './security'
 import { AuthProvider, RequireAuth, useAuth } from './auth'
 import StartupGate from './components/StartupGate'
 import { useAndroidBackButton } from './utils/hardwareBack'
-import { eventListener } from './utils/functions'
+import { eventListener, makeDayKey } from './utils/functions'
 import { getAndroidPrivacyModeEnabled, PRIVACY_SETTINGS_CHANGED_EVENT } from './data/privacy'
 
 const Login = lazy(() => import('./pages/Login'))
@@ -138,18 +138,31 @@ type LockedRoute = {
 }
 
 const lockedRouts: LockedRoute[] = [
-  { path: "/today", item: <SingleDay dayType="today" /> },
-  { path: "/yesterday", item: <SingleDay dayType="yesterday" /> },
+  { path: "/day/:date", item: <SingleDay /> },
   { path: "/notes", item: <Notes /> },
   { path: "/notes/:date", item: <NoteDetailGate /> },
   { path: "/accomplishments", item: <Accomplishments /> },
   { path: "/settings", item: <Settings /> },
 ]
 
-const navbarItems = [
+// Called fresh on every navigation and render, never cached, so nothing goes stale over midnight.
+const dayPath = (daysAgo: number) => {
+  const date = new Date()
+  date.setDate(date.getDate() - daysAgo)
+  return `/day/${makeDayKey(date)}`
+}
+
+type NavbarItem = {
+  text: string
+  shortText: string
+  link: string
+  activePath?: () => string
+}
+
+const navbarItems: NavbarItem[] = [
   { text: "Home", shortText: "Home", link: "/" },
-  { text: "Today", shortText: "Today", link: "/today" },
-  { text: "Yesterday", shortText: "Yest.", link: "/yesterday" },
+  { text: "Today", shortText: "Today", link: "/today", activePath: () => dayPath(0) },
+  { text: "Yesterday", shortText: "Yest.", link: "/yesterday", activePath: () => dayPath(1) },
   { text: "Notes", shortText: "Notes", link: "/notes" },
   { text: "Accomplishments", shortText: "Accom.", link: "/accomplishments" },
   { text: "Settings", shortText: "Sett.", link: "/settings" },
@@ -163,7 +176,11 @@ function AppShell() {
     {isAuthenticated && location.pathname !== '/login' && <nav className="navbar">
       <div className="navLinks">
         {navbarItems.map(item => (
-          <NavLink key={item.link} to={item.link} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+          <NavLink
+            key={item.link}
+            to={item.link}
+            className={({ isActive }) => (isActive || item.activePath?.() === location.pathname ? 'active' : undefined)}
+          >
             <span className="navLabelFull">{item.text}</span>
             <span className="navLabelShort">{item.shortText}</span>
           </NavLink>
@@ -174,6 +191,8 @@ function AppShell() {
       <Suspense fallback={<div className="state">Loading...</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/today" element={<DayRedirect daysAgo={0} />} />
+          <Route path="/yesterday" element={<DayRedirect daysAgo={1} />} />
           <Route
             path="/"
             element={<ProtectedAppRoute><Home /></ProtectedAppRoute>}
@@ -194,6 +213,8 @@ function AppShell() {
     </main>
   </div>
 }
+
+const DayRedirect = ({ daysAgo }: { daysAgo: number }) => <Navigate to={dayPath(daysAgo)} replace />
 
 function AndroidBackButtonBridge() {
   useAndroidBackButton()
