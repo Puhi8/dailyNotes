@@ -2,9 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
-      - "[0-9]*"
+    branches: [main]
+  workflow_dispatch:
 
 # Everything here runs on free tiers: public repos get unlimited standard-runner
 # minutes, GHCR is free for public packages, and Pages is free for public repos.
@@ -13,7 +12,31 @@ permissions:
   packages: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # frontend/package.json is the version source; an existing tag means this
+      # commit is not a release, so ordinary pushes to main do nothing.
+      - id: version
+        run: |
+          tag="v$(node -p "require('./frontend/package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag is already released, skipping."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Releasing $tag."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,15 +69,6 @@ jobs:
       - run: npm ci
         working-directory: frontend
 
-      - name: Check the tag matches frontend/package.json
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          package="$(node -p "require('./frontend/package.json').version")"
-          [[ "$tag" == "$package" ]] || {
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $package. Run ./set-version.sh $tag first." >&2
-            exit 1
-          }
-
       - name: Restore the signing keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -79,4 +93,4 @@ jobs:
             VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/dailyNotes/ npm run build &&
             npx gh-pages -d dist -u "github-actions <github-actions@github.com>"
             -r "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-        run: ./release.sh "$GITHUB_REF_NAME"
+        run: ./release.sh "${{ needs.check.outputs.tag }}"
