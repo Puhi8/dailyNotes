@@ -80,11 +80,20 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
 
+      # release.sh creates an annotated tag, which needs a committer identity.
+      - name: Configure the git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Build and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_REMOTE: origin
+          # Optional GHCR fallback: release.sh prefers CR_PAT over GITHUB_TOKEN, and an
+          # unset secret is empty, so this stays a no-op until the secret exists.
+          CR_PAT: ${{ secrets.CR_PAT }}
           # Empty secrets fall through to the debug-keystore defaults in build-android-apk.sh.
           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
