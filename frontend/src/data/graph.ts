@@ -1,7 +1,6 @@
 import { manageLocalStorage } from "../utils/localProcessing"
 import type { DayEntry } from './types'
 import { formatDateKey } from "../utils/functions"
-import { months } from "./data"
 import { getAccentColorRgb } from './theme'
 
 const GRAPH_SETTINGS_KEY = 'dailynotes.graphSettings'
@@ -14,11 +13,6 @@ export type ChartPoint = {
   date: string
   raw: number
   smooth10: number
-}
-
-type HeatmapMonthBlock = {
-  label: string
-  weeks: Array<Array<string | null>>
 }
 
 const clampCompactness = (value: number) => Math.min(GRAPH_COMPACTNESS_MAX, Math.max(GRAPH_COMPACTNESS_MIN, value))
@@ -91,8 +85,6 @@ const parseDateKey = (key: string) => {
   return date
 }
 
-const getMonth = (date: Date, extra = 0, day = 1) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + extra, day))
-
 const formatAxisDate = (key: string) => {
   const parts = key.split('-')
   if (parts.length !== 3) return key
@@ -144,30 +136,6 @@ const buildHeatmapWeeks = (startKey: string, endKey: string) => {
   const end = parseDateKey(endKey)
   if (!start || !end || start > end) return []
   return buildWeeks(start, end, (d) => formatDateKey(d)) as string[][]
-}
-
-const buildHeatmapMonthBlocks = (startKey: string, endKey: string) => {
-  const rangeStart = parseDateKey(startKey)
-  const rangeEnd = parseDateKey(endKey)
-  if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) return []
-  const blocks: HeatmapMonthBlock[] = []
-  for (let cursor = getMonth(rangeStart); cursor <= getMonth(rangeEnd); cursor.setUTCMonth(cursor.getUTCMonth() + 1)) {
-    const monthStart = getMonth(cursor)
-    const monthEnd = getMonth(cursor, 1, 0)
-    const visibleStart = new Date(Math.max(monthStart.getTime(), rangeStart.getTime()))
-    const visibleEnd = new Date(Math.min(monthEnd.getTime(), rangeEnd.getTime()))
-    if (visibleStart > visibleEnd) continue
-    blocks.push({
-      label: months.short[cursor.getUTCMonth()],
-      weeks: buildWeeks(visibleStart, visibleEnd,
-        (day) => {
-          const t = day.getTime()
-          return t >= visibleStart.getTime() && t <= visibleEnd.getTime() ? formatDateKey(day) : null
-        }
-      )
-    })
-  }
-  return blocks
 }
 
 const buildLineChartData = (dates: string[], dataByDate: Record<string, DayEntry>): ChartPoint[] => (
@@ -236,7 +204,6 @@ export default {
   },
   heatmap: {
     weeks: buildHeatmapWeeks,
-    monthBlocks: buildHeatmapMonthBlocks,
     singleHueColor: getSingleHueHeatmapColor
   },
   colors: { progress: getProgressColor },

@@ -1,5 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+import preact from '@preact/preset-vite'
 
 const ensureLeadingSlash = (value: string) => (value.startsWith('/') ? value : `/${value}`)
 const ensureTrailingSlash = (value: string) => (value.endsWith('/') ? value : `${value}/`)
@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => {
   const isGithubPagesBuild = env.VITE_ROUTER_MODE === 'hash'
 
   return {
-    plugins: [react()],
+    // Also aliases react and react-dom to preact/compat, for the code here and for react-router and recharts.
+    plugins: [preact()],
     base: configuredBase
       ? normalizeBasePath(configuredBase)
       : isGithubPagesBuild

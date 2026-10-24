@@ -5,11 +5,13 @@ import {
   defaultValueForAccomplishmentType,
   defaultValueForSample,
   getUsedAccomplishments,
+  hasNoteMark,
   loadLocalState,
   normalizeAccomplishmentType,
   normalizeDayValueForAccomplishmentType,
   normalizeDayKey,
   parseDayKey,
+  stripNoteMark,
   taskCompleted,
   type AccomplishmentItem,
   type DayData,
@@ -205,10 +207,11 @@ export async function listNotes(): Promise<NoteSummary[]> {
   return Object.keys(state.days)
     .sort(compareDayKeys)
     .reverse()
-    .map(date => ({
-      date,
-      hasNote: (state.days[date]?.note ?? '').trim() !== '',
-    }))
+    .map(date => {
+      const rawNote = state.days[date]?.note ?? ''
+      const note = stripNoteMark(rawNote).trim()
+      return { date, hasNote: note !== '', length: note.length, marked: hasNoteMark(rawNote) }
+    })
 }
 
 export async function getNoteTemplate(): Promise<NoteTemplateResponse> {
@@ -232,5 +235,5 @@ export async function fetchNote(date: string): Promise<NoteEntry> {
   const state = await loadLocalState()
   const key = normalizeDayKey(date)
   const note = state.days[key]?.note ?? ''
-  return { date: key, note }
+  return { date: key, note: stripNoteMark(note), marked: hasNoteMark(note) }
 }

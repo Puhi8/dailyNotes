@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NativeBiometric } from '@capgo/capacitor-native-biometric'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -42,6 +42,8 @@ type SecurityContextValue = {
   unlockWithBiometrics: (scope?: UnlockScope) => Promise<boolean>
   setDevicePin: (pin: string) => void
   lock: (scope?: UnlockScope | 'all') => void
+  marksVisible: boolean
+  setMarksVisible: (visible: boolean) => void
 }
 
 const SecurityContext = createContext<SecurityContextValue | null>(null)
@@ -61,6 +63,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
   const { focus: requireBackInFocusUnlock } = useSecurityReauthSettings()
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [isHomeUnlocked, setIsHomeUnlocked] = useState(false)
+  const [marksVisible, setMarksVisible] = useState(false)
   const biometricPromptActive = useRef(false)
   const [biometric, setBiometric] = useObjectState<{ available: boolean; enabled: boolean; ready: boolean }>({
     available: false, enabled: manageLocalStorage.get(BIOMETRIC_ENABLED_KEY, null) === "1", ready: !isNative
@@ -131,6 +134,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
   }, [setBiometric])
 
   const lock = useCallback((scope: UnlockScope | 'all' = 'all') => {
+    setMarksVisible(false)
     if (scope === 'home') {
       setIsHomeUnlocked(false)
       return
@@ -142,6 +146,11 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     setIsHomeUnlocked(false)
     setIsUnlocked(false)
   }, [])
+
+  // Marks hide whenever the app leaves the screen, whatever the lock settings are.
+  useEffect(() => eventListener.document(['visibilitychange'], () => {
+    if (document.visibilityState !== 'visible' && !biometricPromptActive.current) setMarksVisible(false)
+  }), [])
 
   useEffect(() => {
     if (!requireBackInFocusUnlock || !hasPin) return
@@ -196,8 +205,10 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
       unlockWithBiometrics,
       setDevicePin,
       lock,
+      marksVisible,
+      setMarksVisible,
     }),
-    [biometric.available, biometric.enabled, biometric.ready, confirmBiometricIdentity, deviceHasPin, hasPin, isHomeUnlocked, isUnlocked, lock, setBiometricEnabled, setDevicePin, unlockWithBiometrics, unlockWithPin, verifyPin]
+    [biometric.available, biometric.enabled, biometric.ready, confirmBiometricIdentity, deviceHasPin, hasPin, isHomeUnlocked, isUnlocked, lock, marksVisible, setBiometricEnabled, setDevicePin, unlockWithBiometrics, unlockWithPin, verifyPin]
   )
   return <SecurityContext.Provider value={value}>{children}</SecurityContext.Provider>
 }
@@ -325,7 +336,8 @@ export function RequireReauth({
     }
   }, [])
 
-  useEffect(() => {
+  // Layout effect: Preact runs plain effects a frame late, which could wipe a PIN already being typed.
+  useLayoutEffect(() => {
     didFocusBiometric.current = false
     setBiometricSettled(false)
     if (!isCompleted && !isRequirementDisabled) {

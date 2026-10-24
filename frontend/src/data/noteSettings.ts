@@ -3,6 +3,8 @@ import { api } from './api'
 
 const NOTE_TEMPLATE_KEY = 'dailynotes.noteTemplate'
 const NOTE_HEADER_COLORS_KEY = 'dailynotes.noteHeaderColors'
+const NOTE_LENGTH_SHADE_KEY = 'dailynotes.noteLengthShade'
+const NOTE_SWIPE_KEY = 'dailynotes.noteSwipe'
 const NOTE_TEMPLATE_CHANGED_EVENT = 'dailynotes.noteTemplateChanged'
 
 export const notifyNoteTemplateChanged = () => {
@@ -15,6 +17,16 @@ export const getNoteTemplate = () => manageLocalStorage.get(NOTE_TEMPLATE_KEY, "
 export const getNoteHeaderColors = () => manageLocalStorage.get(NOTE_HEADER_COLORS_KEY, true, value => value !== 'false')
 export const setNoteHeaderColors = (enabled: boolean) => {
   manageLocalStorage.set({ key: NOTE_HEADER_COLORS_KEY, value: enabled })
+  return enabled
+}
+export const getNoteLengthShade = () => manageLocalStorage.get(NOTE_LENGTH_SHADE_KEY, false, value => value === 'true')
+export const setNoteLengthShade = (enabled: boolean) => {
+  manageLocalStorage.set({ key: NOTE_LENGTH_SHADE_KEY, value: enabled })
+  return enabled
+}
+export const getNoteSwipe = () => manageLocalStorage.get(NOTE_SWIPE_KEY, true, value => value !== 'false')
+export const setNoteSwipe = (enabled: boolean) => {
+  manageLocalStorage.set({ key: NOTE_SWIPE_KEY, value: enabled })
   return enabled
 }
 

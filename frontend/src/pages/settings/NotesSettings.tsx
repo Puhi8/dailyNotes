@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import MarkdownEditor from '../../components/MarkdownEditor'
-import { getNoteHeaderColors, getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi, setNoteHeaderColors, subscribeNoteTemplateChange } from '../../data/noteSettings'
+import { getNoteHeaderColors, getNoteLengthShade, getNoteSwipe, getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi, setNoteHeaderColors, setNoteLengthShade, setNoteSwipe, subscribeNoteTemplateChange } from '../../data/noteSettings'
 import type { StatusOptions } from '../../data/types'
 import { Button, ToggleSwitch } from '../../utils/simplifyReact'
 import { SettingsSection } from './SettingsShared'
@@ -8,6 +8,8 @@ import { SettingsSection } from './SettingsShared'
 export default function NotesSettings() {
   const [noteTemplate, setNoteTemplateState] = useState(() => getNoteTemplate())
   const [colorNoteHeadings, setColorNoteHeadingsState] = useState(() => getNoteHeaderColors())
+  const [shadeByLength, setShadeByLength] = useState(() => getNoteLengthShade())
+  const [swipeNotes, setSwipeNotes] = useState(() => getNoteSwipe())
   const [status, setStatus] = useState<StatusOptions>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -56,6 +58,28 @@ export default function NotesSettings() {
           ariaLabel="Toggle note heading colors"
           checked={colorNoteHeadings}
           onChange={() => setColorNoteHeadingsState(setNoteHeaderColors(!colorNoteHeadings))}
+        />
+      </span>
+    </div>
+    <div className="panelRow">
+      <span>Shade calendar by note length</span>
+      <span className="panelRowValue panelRowValueToggle">
+        {shadeByLength ? 'Enabled' : 'Disabled'}
+        <ToggleSwitch
+          ariaLabel="Toggle calendar shading by note length"
+          checked={shadeByLength}
+          onChange={() => setShadeByLength(setNoteLengthShade(!shadeByLength))}
+        />
+      </span>
+    </div>
+    <div className="panelRow">
+      <span>Swipe between notes</span>
+      <span className="panelRowValue panelRowValueToggle">
+        {swipeNotes ? 'Enabled' : 'Disabled'}
+        <ToggleSwitch
+          ariaLabel="Toggle swiping between notes"
+          checked={swipeNotes}
+          onChange={() => setSwipeNotes(setNoteSwipe(!swipeNotes))}
         />
       </span>
     </div>

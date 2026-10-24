@@ -33,11 +33,24 @@ export type IndividualDayResponse = {
 export type NoteSummary = {
   date: string
   hasNote: boolean
+  length: number
+  marked: boolean
 }
 
 export type NoteEntry = {
   date: string
   note: string
+  marked: boolean
+}
+
+// The mark lives in the note text as its own line so backups carry it, and is stripped before anything is shown.
+const NOTE_MARK = '#marked'
+export const hasNoteMark = (note: string) => /(^|\n)#marked[ \t]*(?=\r?\n|$)/.test(note)
+export const stripNoteMark = (note: string) => note.replace(/(^|\n)#marked[ \t]*(?=\r?\n|$)/g, '')
+export const withNoteMark = (note: string, marked: boolean) => {
+  const plain = stripNoteMark(note)
+  if (!marked) return plain
+  return plain ? `${plain}\n${NOTE_MARK}` : NOTE_MARK
 }
 
 export type NoteTemplateResponse = {

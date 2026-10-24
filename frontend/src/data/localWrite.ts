@@ -15,6 +15,7 @@ import {
   type IndividualDayResponse,
   dayKey,
   normalizeDayKey,
+  withNoteMark,
 } from './localCore'
 
 export type SaveDayPayload = Partial<Pick<IndividualDayResponse, 'data' | 'note'>>
@@ -81,6 +82,18 @@ export async function saveIndividualDay(date: string, payload: SaveDayPayload): 
   const dateKey = normalizeDayKey(date)
   if (!dayKey.isEditable(dateKey)) throw new Error(`${dateKey} is closed for editing.`)
   return withLocalStateWrite(async state => (await saveDayPayload(state, dateKey, payload)))
+}
+
+// A mark is not an edit of the day, so it also works on days closed for editing.
+export async function setNoteMarked(date: string, marked: boolean) {
+  const dateKey = normalizeDayKey(date)
+  return withLocalStateWrite(async state => {
+    const day = state.days[dateKey]
+    if (!day) throw new Error(`No note for ${dateKey}.`)
+    day.note = withNoteMark(day.note, marked)
+    await persistLocalState(state)
+    return marked
+  })
 }
 
 export async function createAccomplishment(name: string, type = ''): Promise<AccomplishmentItem> {

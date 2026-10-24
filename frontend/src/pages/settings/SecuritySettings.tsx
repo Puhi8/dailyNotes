@@ -50,12 +50,10 @@ export default function SecuritySettings() {
     setPinPopupOpen(true)
   }
 
-  const handleSavePin = (event: FormEvent) => {
+  const canChangePinWithFingerprint = hasDevicePin && biometricEnabled && biometricAvailable
+
+  const handleSavePin = async (event: FormEvent) => {
     event.preventDefault()
-    if (hasDevicePin && !verifyPin(pin.current.trim())) {
-      setErrors({ pin: 'Current PIN is incorrect.' })
-      return
-    }
     const normalized = pin.draft.trim()
     if (!/^\d+$/.test(normalized)) {
       setErrors({ pin: 'PIN should contain only numbers.' })
@@ -64,6 +62,14 @@ export default function SecuritySettings() {
     if (normalized !== pin.confirm.trim()) {
       setErrors({ pin: 'PINs do not match.' })
       return
+    }
+    if (hasDevicePin && !verifyPin(pin.current.trim())) {
+      // An empty current PIN means a forgotten one: the fingerprint stands in for it.
+      const useFingerprint = canChangePinWithFingerprint && pin.current.trim() === ''
+      if (!useFingerprint || !(await confirmBiometricIdentity('Confirm PIN change'))) {
+        setErrors({ pin: useFingerprint ? 'Fingerprint confirmation failed.' : 'Current PIN is incorrect.' })
+        return
+      }
     }
     setPinPopupOpen(false)
     setDevicePin(normalized)
@@ -169,6 +175,7 @@ export default function SecuritySettings() {
     </SettingsSection>
     {pinPopupOpen && <PinPopup
       hasDevicePin={hasDevicePin}
+      canUseFingerprint={canChangePinWithFingerprint}
       values={pin}
       error={errors.pin}
       onChange={(field, value) => { setPin({ [field]: value } as Partial<PinState>); setErrors({ pin: null }) }}

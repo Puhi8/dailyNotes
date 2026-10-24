@@ -7,6 +7,7 @@ import StartupGate from './components/StartupGate'
 import { useAndroidBackButton } from './utils/hardwareBack'
 import { eventListener, makeDayKey } from './utils/functions'
 import { getAndroidPrivacyModeEnabled, PRIVACY_SETTINGS_CHANGED_EVENT } from './data/privacy'
+import { useSecurityReauthSettings } from './data/securitySettings'
 
 const Login = lazy(() => import('./pages/Login'))
 const Home = lazy(() => import('./home'))
@@ -242,12 +243,18 @@ function EnterGate({ children }: { children: ReactNode }) {
 
 function NoteDetailGate() {
   const { date } = useParams()
+  const { hasPin } = useSecurity()
+  const { internal } = useSecurityReauthSettings()
+  // A new key per date asks again for every note; without that the page stays mounted, so a swipe has no flash.
   return <RequireReauth
-    key={date ?? 'note'}
+    key={hasPin && internal ? date ?? 'note' : 'note'}
     title="Confirm note access"
     message="Confirm your PIN or fingerprint to view this day note."
     reauthMoment="internal"
   >
-    <NoteDetail />
+    {/* Preact remounts everything up to the nearest Suspense while a lazy page loads, which would forget this unlock */}
+    <Suspense fallback={<div className="state">Loading...</div>}>
+      <NoteDetail />
+    </Suspense>
   </RequireReauth>
 }

@@ -31,6 +31,7 @@ type ServerPopupConfig = {
 
 type PinPopupConfig = {
   hasDevicePin: boolean
+  canUseFingerprint: boolean
   values: PinValues
   error: string | null
   onChange: (field: keyof PinValues, value: string) => void
@@ -104,11 +105,13 @@ export const ServerPopup = ({ draft, error, onDraftChange, onSave, onClose }: Se
   </SettingsFormPopup>
 )
 
-export const PinPopup = ({ hasDevicePin, values, error, onChange, onSave, onClose }: PinPopupConfig) => (
+export const PinPopup = ({ hasDevicePin, canUseFingerprint, values, error, onChange, onSave, onClose }: PinPopupConfig) => (
   <SettingsFormPopup
     titleId="pin-edit-title"
     title="Device PIN"
-    description="Set a new PIN for this device."
+    description={canUseFingerprint
+      ? 'Set a new PIN for this device. Forgot the current one? Leave it empty to confirm with your fingerprint.'
+      : 'Set a new PIN for this device.'}
     error={error}
     onSave={onSave}
     onClose={onClose}

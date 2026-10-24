@@ -105,6 +105,7 @@
 }
 
 .chartHeader {
+  position: relative;
   display: grid;
   gap: 6px;
 }
@@ -163,7 +164,8 @@
   height: clamp(260px, 45vh, 520px);
 }
 
-.chartAreaCompact {
+/* Two classes, so the fixed mobile chart height in responsive.css cannot cut the heatmap off */
+.chartArea.chartAreaCompact {
   height: auto;
 }
 
@@ -177,19 +179,18 @@
   position: relative;
   width: 100%;
   --heatmap-cell: 12px;
+  --heatmap-month-line: color-mix(in srgb, var(--text) 55%, transparent);
 }
 
-.heatmapMonthGrid {
-  display: flex;
-  flex-wrap: wrap;
-  column-gap: 4px;
-  row-gap: 16px;
-  align-items: flex-start;
+.heatmapScroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
-.heatmapMonthBlock {
+.heatmapGrid {
   display: grid;
   gap: 6px;
+  width: max-content;
 }
 
 .heatmapMonths {
@@ -205,6 +206,7 @@
   line-height: 1;
   color: var(--muted);
   text-align: left;
+  white-space: nowrap;
 }
 
 .heatmap {
@@ -235,50 +237,83 @@
   box-shadow: 0 0 0 1px rgba(235, 60, 47, 0.45);
 }
 
+/* Same invisible border as a cell, so the month line sits at the same offsets on both */
 .heatmapSpacer {
   width: var(--heatmap-cell);
   height: var(--heatmap-cell);
+  border: 1px solid transparent;
 }
 
-.heatmapTooltip {
+:is(.heatmapCell, .heatmapSpacer) {
+  position: relative;
+}
+
+/* Month line pieces, centered in the 4px gaps; they overlap at the corners so the steps join.
+   A plain list, since pseudo-elements cannot go inside :is() */
+.heatmapEdgeRight::after,
+.heatmapEdgeBottom::before {
+  content: "";
   position: absolute;
-  z-index: 2;
+  background: var(--heatmap-month-line);
   pointer-events: none;
+}
+
+.heatmapEdgeRight::after {
+  top: -3px;
+  bottom: -3px;
+  right: -4px;
+  width: 2px;
+}
+
+.heatmapEdgeBottom::before {
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  height: 2px;
+}
+
+.heatmapCellSelected {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+/* Sits on the card header; anchored at its bottom, so a long list grows upward and never over the graph */
+.chartDayPopup {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 100%;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 8px 12px;
   background: var(--panel-strong);
   border: 1px solid var(--panel-edge);
-  border-radius: 10px;
-  padding: 8px 10px;
-  color: var(--text);
+  border-radius: 12px;
   box-shadow: 0 12px 30px rgba(58, 64, 75, 0.55);
-  white-space: nowrap;
-}
-
-.heatmapTooltipTitle {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.heatmapTooltipList {
-  margin-top: 8px;
-  display: grid;
-  gap: 4px;
-}
-
-.heatmapTooltipRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.heatmapTooltipRow > span:first-child {
   color: var(--text);
+  pointer-events: none;
 }
 
-.heatmapTooltipEmpty {
+.chartDayPopupTitle {
+  font-weight: 600;
+}
+
+.chartDayPopupList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+
+:is(.chartDayPopupValue, .chartDayPopupEmpty) {
   color: var(--muted);
-  font-size: 12px;
+}
+
+.chartDayPopupEmpty {
+  font-size: 13px;
 }
 
 .heatmapEmpty {

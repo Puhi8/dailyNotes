@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type BackupAccomplishmentChoice, type BackupConflictChoice, type BackupPullPreview, type BackupSyncStatus } from '../../data/api'
+import { stripNoteMark } from '../../data/localCore'
 import { notifyNoteTemplateChanged } from '../../data/noteSettings'
 import type { StatusOptions } from '../../data/types'
 import { toUpperCase, useObjectState } from '../../utils/functions'
@@ -43,7 +44,7 @@ function formatServerDisplay(value: string) {
 }
 
 function summarizeConflictDay(source: { note: string; data: Record<string, unknown> }) {
-  return `${Object.keys(source.data ?? {}).length} tasks, ${source.note.trim() ? 'has' : 'no'} note`
+  return `${Object.keys(source.data ?? {}).length} tasks, ${stripNoteMark(source.note).trim() ? 'has' : 'no'} note`
 }
 
 export default function BackupSettings() {

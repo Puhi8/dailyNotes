@@ -1,19 +1,20 @@
-import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type ReactNode, type SetStateAction } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { DayEntry, ServerData } from '../data/types'
-import graph, { type ChartPoint } from '../data/graph'
+import graph from '../data/graph'
 import { LineChart, XAxis, YAxis, Line, ResponsiveContainer, CartesianGrid, Tooltip } from 'recharts'
 import { dayKey } from '../data/localCore'
 import { months } from '../data/data'
+import { eventListener } from '../utils/functions'
 
-type HeatmapTooltip = {
-  x: number
-  y: number
-  date: string
-}
+type SelectDay = (date: string | null) => void
+type ChartView = 'line' | 'heatmap'
+
+const ACTIVE_DOT = { r: 6, fill: 'var(--text)', stroke: 'var(--panel)', strokeWidth: 2 }
 
 export default function HomeGraphs({ data }: { data: ServerData }) {
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
-  const [chartView, setChartView] = useState<'line' | 'heatmap'>('line')
+  const [chartView, setChartView] = useState<ChartView>('line')
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const lineMode = graph.settings.line.mode.get()
   const showRawLine = lineMode !== 'avg10_all_days'
   const showAverageLine = lineMode !== 'raw'
@@ -28,6 +29,10 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
   const averageAllDaysOnly = lineMode === 'avg10_all_days'
   const lineDates = pointLimit > 0 && dateList.length > pointLimit ? dateList.slice(-pointLimit) : dateList
   const shownLineDates = averageAllDaysOnly ? dateList : lineDates
+  const showView = (view: ChartView) => {
+    setChartView(view)
+    setSelectedDate(null)
+  }
 
   return <section className="chartCard">
     <div className="chartHeader">
@@ -36,13 +41,13 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
         <div className="chartActions">
           <button
             className={chartView === 'line' ? 'active' : undefined}
-            onClick={() => setChartView('line')}
+            onClick={() => showView('line')}
           >
             Line
           </button>
           <button
             className={chartView === 'heatmap' ? 'active' : undefined}
-            onClick={() => setChartView('heatmap')}
+            onClick={() => showView('heatmap')}
           >
             Heatmap
           </button>
@@ -52,6 +57,7 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
         ? <p>10-day average across all {dateList.length} days</p>
         : <p>Last {shownLineDates.length} days{showAverageLine ? ' (raw + 10-day average)' : ''}</p>
       }
+      {selectedDate && <DayPopup date={selectedDate} entry={data.data[selectedDate]} />}
     </div>
     <div className={`chartArea ${chartView === 'heatmap' ? 'chartAreaCompact' : ''}`}>
       {chartView === 'line'
@@ -63,8 +69,15 @@ export default function HomeGraphs({ data }: { data: ServerData }) {
           showAverageLine={showAverageLine}
           averageAllDaysOnly={averageAllDaysOnly}
           onResize={setChartSize}
+          onSelect={setSelectedDate}
         />
-        : <Heatmap range={{ start: rangeStart, end: rangeEnd }} dataByDate={data.data} todayKey={todayKey} />
+        : <Heatmap
+          range={{ start: rangeStart, end: rangeEnd }}
+          dataByDate={data.data}
+          todayKey={todayKey}
+          selectedDate={selectedDate}
+          onSelect={setSelectedDate}
+        />
       }
     </div>
   </section>
@@ -78,9 +91,10 @@ type HomeGraphProps = {
   showAverageLine: boolean
   averageAllDaysOnly: boolean
   onResize: (size: { width: number; height: number }) => void
+  onSelect: SelectDay
 }
 
-function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine, averageAllDaysOnly, onResize }: HomeGraphProps) {
+function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine, averageAllDaysOnly, onResize, onSelect }: HomeGraphProps) {
   const safeMaxValue = 100
   const chartData = graph.line.build(dates, dataByDate)
   const isMobileChart = chartSize.width > 0 && chartSize.width <= 560
@@ -125,13 +139,14 @@ function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine,
         domain={[0, safeMaxValue]}
         tick={{ fill: 'var(--muted)', fontSize: 0 }}
       />
-      <Tooltip content={<GraphTooltip dataByDate={dataByDate} />} />
+      <Tooltip content={<TooltipSelection onSelect={onSelect} />} cursor={{ stroke: 'var(--muted)', strokeWidth: 1 }} />
       {showRawLine && <Line
         type="linear"
         dataKey="raw"
         stroke="url(#lineGradient)"
         strokeWidth={showAverageLine ? 2.4 : 3}
         strokeOpacity={showAverageLine ? 0.7 : 1}
+        activeDot={ACTIVE_DOT}
         dot={({ cx, cy, value }) => {
           if (typeof value !== 'number' || cx == null || cy == null) return null
           return <circle
@@ -150,195 +165,123 @@ function HomeGraph({ dates, chartSize, dataByDate, showRawLine, showAverageLine,
         stroke="var(--warn)"
         strokeWidth={averageAllDaysOnly ? 3.2 : 3}
         dot={false}
+        activeDot={showRawLine ? false : ACTIVE_DOT}
       />}
     </LineChart>
   </ResponsiveContainer>
 }
 
-function Heatmap({ range, dataByDate, todayKey, }: {
+function Heatmap({ range, dataByDate, todayKey, selectedDate, onSelect }: {
   range: { start: string, end: string }
   dataByDate: Record<string, DayEntry>
   todayKey: string
+  selectedDate: string | null
+  onSelect: SelectDay
 }) {
-  const wrapperRef = useRef<HTMLDivElement | null>(null)
-  const [tooltip, setTooltip] = useState<HeatmapTooltip | null>(null)
-  const [splitByMonth, setSplitByMonth] = useState(false)
-  const weeks = graph.heatmap.weeks(range.start, range.end)
+  // Newest week first, so it is on the left and a wide heatmap opens on it without scrolling.
+  const weeks = graph.heatmap.weeks(range.start, range.end).reverse()
   const useMultiColor = graph.settings.heatmap.multiColor.get()
-  const monthBlocks = graph.heatmap.monthBlocks(range.start, range.end)
+
   useEffect(() => {
-    const wrapper = wrapperRef.current
-    if (!wrapper) return
-    const update = () => {
-      const width = wrapper.clientWidth
-      if (!width) return
-      const cellSize = Number.parseFloat(window.getComputedStyle(wrapper).getPropertyValue('--heatmap-cell')) || 12
-      const gap = 4
-      const weekCount = weeks.length
-      const estimatedWidth = weekCount > 0 ? (weekCount * cellSize) + ((weekCount - 1) * gap) : 0
-      const nextSplit = estimatedWidth > width
-      setSplitByMonth(current => (current === nextSplit ? current : nextSplit))
-    }
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(wrapper)
-    return () => observer.disconnect()
-  }, [weeks.length])
+    if (!selectedDate) return
+    return eventListener.document(['pointerdown'], event => {
+      if (!(event.target as Element | null)?.closest?.('.heatmapWrapper')) onSelect(null)
+    })
+  }, [onSelect, selectedDate])
 
   if (!(weeks && weeks.length > 0)) return <div className="heatmapEmpty">No heatmap data</div>
 
-  const renderContext = { dataByDate, todayKey, setTooltip, useMultiColor }
-  const tooltipEntries = tooltip ? Object.entries(dataByDate[tooltip.date]?.data ?? {}) : []
-  const combinedColumns = splitByMonth ? null : buildCombinedHeatmapColumns(weeks, renderContext)
-  return <div className="heatmapWrapper" ref={wrapperRef} onMouseLeave={() => setTooltip(null)}>
-    <div className="heatmapMonthGrid">
-      {splitByMonth
-        ? [...monthBlocks].reverse().map((block, blockIndex) => renderHeatmapMonthBlock(block, blockIndex, renderContext))
-        : <div className="heatmapMonthBlock">
-          <div className="heatmapMonths">{combinedColumns?.monthLabels}</div>
-          <div className="heatmap">{combinedColumns?.weekColumns}</div>
+  const renderContext = { dataByDate, todayKey, selectedDate, onSelect, useMultiColor }
+  // Only a real mouse leaving clears the day; a lifted finger also "leaves", so on a phone the day stays until another tap.
+  return <div className="heatmapWrapper" onPointerLeave={event => { if (event.pointerType === 'mouse') onSelect(null) }}>
+    <div className="heatmapScroll">
+      <div className="heatmapGrid">
+        <div className="heatmapMonths">
+          {heatmapMonthLabels(weeks).map((label, weekIndex) => <div className="heatmapMonth" key={`month-${weekIndex}`}>{label}</div>)}
         </div>
-      }
+        <div className="heatmap">{weeks.map((week, weekIndex) => renderHeatmapWeekColumn(week, weeks[weekIndex + 1], String(weekIndex), renderContext))}</div>
+      </div>
     </div>
-    {tooltip && <div className="heatmapTooltip" style={{ left: tooltip.x, top: tooltip.y }}>
-      <div className="heatmapTooltipTitle">{tooltip.date}</div>
-      <div className="heatmapTooltipList">{(tooltipEntries.length === 0)
-        ? <div className="heatmapTooltipEmpty">No checklist entries</div>
-        : tooltipEntries.map(([key, value]) => (
-          <div key={key} className="heatmapTooltipRow">
-            <span>{key}</span>
-            <span>{formatTooltipValue(value)}</span>
-          </div>
-        ))
-      }</div>
-    </div>}
   </div>
 }
 
 type HeatmapWeek = Array<string | null>
-type HeatmapMonthBlock = ReturnType<typeof graph.heatmap.monthBlocks>[number]
 
 type HeatmapRenderContext = {
   dataByDate: Record<string, DayEntry>
   todayKey: string
-  setTooltip: Dispatch<SetStateAction<HeatmapTooltip | null>>
+  selectedDate: string | null
+  onSelect: SelectDay
   useMultiColor: boolean
 }
 
-const renderHeatmapWeekColumn = (week: HeatmapWeek, keyPrefix: string, context: HeatmapRenderContext) => (
+const monthKey = (date: string | null | undefined) => date?.slice(0, 5)
+
+// The month line runs in the gaps, right of a day whose same weekday in the older column is in another month,
+// and below a day whose next day is; those pieces join into one line that steps where a month starts mid-week.
+const monthEdges = (date: string, olderDate: string | null | undefined, nextDate: string | null | undefined) => [
+  olderDate && monthKey(olderDate) !== monthKey(date) ? ' heatmapEdgeRight' : '',
+  nextDate && monthKey(nextDate) !== monthKey(date) ? ' heatmapEdgeBottom' : ''
+].join('')
+
+const renderHeatmapWeekColumn = (week: HeatmapWeek, olderWeek: HeatmapWeek | undefined, keyPrefix: string, context: HeatmapRenderContext) => (
   <div className="heatmapWeek" key={`week-${keyPrefix}`}>
     {week.map((date, dayIndex) => {
       if (!date) return <div key={`empty-${keyPrefix}-${dayIndex}`} className="heatmapSpacer" />
-      return makeHeatmapWeek(context.dataByDate, date, context.todayKey, context.setTooltip, context.useMultiColor)
+      const edges = monthEdges(date, olderWeek?.[dayIndex], week[dayIndex + 1])
+      return makeHeatmapWeek(date, edges, context)
     })}
   </div>
 )
 
-function renderHeatmapMonthBlock(block: HeatmapMonthBlock, blockIndex: number, context: HeatmapRenderContext) {
-  const monthLabels: ReactNode[] = []
-  const weekColumns: ReactNode[] = []
-  block.weeks.forEach((week, weekIndex) => {
-    const keyPrefix = `${blockIndex}-${weekIndex}`
-    monthLabels.push(<div className="heatmapMonth" key={`month-${keyPrefix}`}>{weekIndex === 0 ? block.label : ''}</div>)
-    weekColumns.push(renderHeatmapWeekColumn(week, keyPrefix, context))
-  })
-  return <div className="heatmapMonthBlock" key={`month-${blockIndex}-${block.label}`}>
-    <div className="heatmapMonths">{monthLabels}</div>
-    <div className="heatmap">{weekColumns}</div>
-  </div>
+const monthLabel = (date: string) => months.short[Number(date.split('-')[1]) - 1] ?? ''
+
+// A week belongs to the month of its Thursday, the month holding most of its days; each month is named above its leftmost (newest) week.
+function heatmapMonthLabels(weeks: HeatmapWeek[]) {
+  const weekMonths = weeks.map(week => monthLabel(week[3] ?? ''))
+  const labels = weekMonths.map((month, weekIndex) => month !== weekMonths[weekIndex - 1] ? month : '')
+  // The current month can be only a week old; its name then gives way instead of overlapping the next one.
+  const nextLabelIndex = labels.findIndex((label, weekIndex) => weekIndex > 0 && label !== '')
+  if (nextLabelIndex !== -1 && nextLabelIndex < 2) labels[0] = ''
+  return labels
 }
 
-
-function buildCombinedHeatmapColumns(weeks: HeatmapWeek[], context: HeatmapRenderContext) {
-  function getCombinedMonthLabel(week: HeatmapWeek, dataByDate: Record<string, DayEntry>, lastMonthLabel: string) {
-    const anchor = week.find((date): date is string => Boolean(date && dataByDate[date])) ?? week.find((date): date is string => Boolean(date))
-    if (!anchor) return { label: '', lastMonthLabel }
-    const parts = anchor.split('-')
-    const month = parts.length === 3 ? Number.parseInt(parts[1], 10) : Number.NaN
-    if (!Number.isFinite(month)) return { label: '', lastMonthLabel }
-    const label = months.short[month - 1] ?? ''
-    if (label && label !== lastMonthLabel) return { label, lastMonthLabel: label }
-    return { label: '', lastMonthLabel }
-  }
-  const monthLabels: ReactNode[] = []
-  const weekColumns: ReactNode[] = []
-  let lastMonthLabel = ''
-  weeks.forEach((week, weekIndex) => {
-    const month = getCombinedMonthLabel(week, context.dataByDate, lastMonthLabel)
-    lastMonthLabel = month.lastMonthLabel
-    monthLabels.push(<div className="heatmapMonth" key={`month-combined-${weekIndex}`}>{month.label}</div>)
-    weekColumns.push(renderHeatmapWeekColumn(week, `combined-${weekIndex}`, context))
-  })
-  return { monthLabels, weekColumns }
-}
-
-function makeHeatmapWeek(
-  dataByDate: Record<string, DayEntry>,
-  date: string,
-  todayKey: string,
-  setTooltip: Dispatch<SetStateAction<HeatmapTooltip | null>>,
-  useMultiColor: boolean,
-) {
-  function heatmapMouseAction(event: MouseEvent, date: string) {
-    const container = event.currentTarget.closest('.heatmapWrapper') as HTMLElement | null
-    if (!container) return
-    const containerRect = container.getBoundingClientRect()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = rect.left - containerRect.left + rect.width + 8
-    const y = rect.top - containerRect.top - 4
-    setTooltip({ x, y, date })
-  }
+function makeHeatmapWeek(date: string, edges: string, { dataByDate, todayKey, selectedDate, onSelect, useMultiColor }: HeatmapRenderContext) {
   const entry = dataByDate[date]
-  if (!entry) return <div key={date} className="heatmapSpacer" />
+  if (!entry) return <div key={date} className={`heatmapSpacer${edges}`} />
   const heatColor = (useMultiColor ? graph.colors.progress : graph.heatmap.singleHueColor)(entry.percent)
   return <div
     key={date}
-    className={`heatmapCell${date === todayKey ? ' heatmapCellToday' : ''}`}
+    className={`heatmapCell${date === todayKey ? ' heatmapCellToday' : ''}${date === selectedDate ? ' heatmapCellSelected' : ''}${edges}`}
     style={{ '--heat-color': heatColor } as CSSProperties}
-    onMouseEnter={event => heatmapMouseAction(event, date)}
+    onMouseEnter={() => onSelect(date)}
+    // A tap on a phone does not always count as the mouse entering, but it is always a click.
+    onClick={() => onSelect(date)}
   />
 }
 
-type GraphTooltipProps = {
-  active?: boolean
-  label?: string
-  payload?: Array<{ payload?: ChartPoint }>
-  dataByDate: Record<string, DayEntry>
+// Recharts still tracks which day the mouse or finger is on; this passes it up instead of drawing a floating box.
+function TooltipSelection({ active, label, onSelect }: { active?: boolean, label?: string, onSelect: SelectDay }) {
+  useEffect(() => onSelect(active && typeof label === 'string' ? label : null), [active, label, onSelect])
+  return null
+}
+
+// Covers the card header, never the graph, so the selected day stays visible; it grows upward when a day has many entries.
+function DayPopup({ date, entry }: { date: string, entry?: DayEntry }) {
+  const entries = Object.entries(entry?.data ?? {})
+  return <div className="chartDayPopup" role="status">
+    <div className="chartDayPopupTitle">{date}</div>
+    {entries.length === 0
+      ? <div className="chartDayPopupEmpty">No checklist entries</div>
+      : <div className="chartDayPopupList">
+        {entries.map(([key, value]) => <span key={key}>{key}: <span className="chartDayPopupValue">{formatTooltipValue(value)}</span></span>)}
+      </div>
+    }
+  </div>
 }
 
 function formatTooltipValue(value: string | number | boolean | null | undefined) {
   if (typeof value === 'boolean') return value ? 'Done' : 'Failed'
   if (value == null || value === "") return 'N/A'
   return String(value)
-}
-
-function GraphTooltip({ active, label, payload, dataByDate }: GraphTooltipProps) {
-  if (!active || !payload || payload.length === 0) return null
-  const point = payload[0]?.payload
-  if (!point) return null
-  const dateKey = typeof label === 'string' ? label : point.date
-  const entries = Object.entries(dateKey ? (dataByDate[dateKey]?.data ?? {}) : {})
-  return <div
-    style={{
-      background: 'var(--panel-strong)',
-      borderRadius: 12,
-      border: '1px solid var(--panel-edge)',
-      boxShadow: '0 12px 30px rgba(58, 64, 75, 0.55)',
-      color: 'var(--text)',
-      padding: '10px 12px',
-      minWidth: 180,
-    }}
-  >
-    <div style={{ fontWeight: 600, marginBottom: 6 }}>{dateKey || label || ''}</div>
-    {entries.length === 0
-      ? <div style={{ color: 'var(--muted)' }}>No checklist entries</div>
-      : entries.map(([key, value]) => (
-        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <span>{key}</span>
-          <span style={{ color: 'var(--muted)' }}>{formatTooltipValue(value)}</span>
-        </div>
-      ))
-    }
-  </div>
 }

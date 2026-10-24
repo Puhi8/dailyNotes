@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import ErrorState from '../components/ErrorState'
 import MarkdownEditor from '../components/MarkdownEditor'
 import { api, type DayData } from '../data/api'
-import { dayKey, normalizeDayKey, openDayEdit, parseDayKey } from '../data/localCore'
+import { dayKey, hasNoteMark, normalizeDayKey, openDayEdit, parseDayKey, stripNoteMark, withNoteMark } from '../data/localCore'
 import { applyNoteTemplate, resolveNoteTemplate } from '../data/noteSettings'
 import type { StatusOptions } from '../data/types'
 import { useObjectState } from '../utils/functions'
@@ -47,6 +47,8 @@ export default function SingleDay() {
   const saveTimerRef = useRef<number | null>(null)
   const saveInFlightRef = useRef(false)
   const queuedSaveRef = useRef(false)
+  // The editor never shows the mark line, so it is put back on save.
+  const markedRef = useRef(false)
 
   useEffect(() => {
     const rejection = !parseDayKey(date) ? `Invalid date: ${date}`
@@ -64,7 +66,8 @@ export default function SingleDay() {
     Promise.all([api.day.getIndividual(date), api.accomplishments.list(), resolveNoteTemplate()])
       .then(([result, accomplishments, template]) => {
         if (cancelled) return
-        const displayNote = applyNoteTemplate(result.note || '', String(template)).note
+        markedRef.current = hasNoteMark(result.note || '')
+        const displayNote = applyNoteTemplate(stripNoteMark(result.note || ''), String(template)).note
         setData({ main: { ...result.data }, original: { ...result.data } })
         setNote({ main: displayNote, original: displayNote })
         setAccomplishmentOrder(accomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean))
@@ -125,7 +128,7 @@ export default function SingleDay() {
     const dataToSave = dataRef.current
     const noteToSave = noteRef.current
     try {
-      await saveIndividualDay(date, { data: dataToSave, note: noteToSave })
+      await saveIndividualDay(date, { data: dataToSave, note: markedRef.current ? withNoteMark(noteToSave, true) : noteToSave })
       setData({ original: dataToSave })
       setNote({ original: noteToSave })
       setSaveStatus('saved')

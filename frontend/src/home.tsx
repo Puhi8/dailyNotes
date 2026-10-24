@@ -53,7 +53,8 @@ export default function Home() {
       observer.disconnect()
       window.removeEventListener('resize', updateStacking)
     }
-  }, [data])
+    // isLoading too: Preact can render the data while still showing "Loading...", before the widgets exist.
+  }, [data, isLoading])
 
   useEffect(() => {
     const container = topWidgetsRef.current
@@ -74,7 +75,7 @@ export default function Home() {
       observer.disconnect()
       window.removeEventListener('resize', updateWidgetFocus)
     }
-  }, [data, shouldStackStats])
+  }, [data, isLoading, shouldStackStats])
 
   if (isLoading) return <div className="state">Loading...</div>
   if (error) return <ErrorState error={error} onReload={() => setReloadToken(token => token + 1)} />

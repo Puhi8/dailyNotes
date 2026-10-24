@@ -1,7 +1,7 @@
 import { getBackupSyncStatus, isBackupAutoSyncEnabled, setBackupAutoSyncEnabled, subscribeBackupSyncStatus, syncBackupNow } from './backupSync'
 import { applyBackupPull, previewBackupPull } from './backupPull'
 import { fetchNote, getDashboardData, getIndividualDay, getNoteTemplate, listAccomplishments, listNotes } from './localRead'
-import { createAccomplishment, deleteAccomplishment, renameAccomplishment, reorderAccomplishments, saveIndividualDay, saveNoteTemplate, setAccomplishmentActive } from './localWrite'
+import { createAccomplishment, deleteAccomplishment, renameAccomplishment, reorderAccomplishments, saveIndividualDay, saveNoteTemplate, setAccomplishmentActive, setNoteMarked } from './localWrite'
 import { DEFAULT_API_BASE_URL, apiBaseUrl, login, logout, subscribeAuthChanges, updateRemoteCredentials, authSession } from './remoteAuth'
 export type { SaveDayPayload } from './localWrite'
 export type { BackupSyncStatus } from './backupSync'
@@ -49,6 +49,7 @@ export const api = {
   notes: {
     list: listNotes,
     get: fetchNote,
+    setMarked: setNoteMarked,
     getTemplate: getNoteTemplate,
     saveTemplate: saveNoteTemplate,
   },
