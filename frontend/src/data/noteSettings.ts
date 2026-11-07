@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { addMyEventListener, manageLocalStorage } from '../utils/localProcessing'
 import { api } from './api'
 
@@ -6,6 +7,8 @@ const NOTE_HEADER_COLORS_KEY = 'dailynotes.noteHeaderColors'
 const NOTE_LENGTH_SHADE_KEY = 'dailynotes.noteLengthShade'
 const NOTE_SWIPE_KEY = 'dailynotes.noteSwipe'
 const NOTE_TEMPLATE_CHANGED_EVENT = 'dailynotes.noteTemplateChanged'
+const QUOTES_ENABLED_KEY = "dailynotes.quotesEnabled"
+const QUOTES_ENABLED_CHANGED_EVENT = "dailynotes.quotesEnabledChanged"
 
 export const notifyNoteTemplateChanged = () => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(NOTE_TEMPLATE_CHANGED_EVENT))
@@ -30,7 +33,19 @@ export const setNoteSwipe = (enabled: boolean) => {
   return enabled
 }
 
-const ensureEditableTemplateEnd = (template: string) => template.endsWith('\n') ? template : `${template}\n`
+export const getQuotesEnabled = () => manageLocalStorage.get(QUOTES_ENABLED_KEY, true, value => value !== "false")
+export const setQuotesEnabled = (enabled: boolean) => {
+  manageLocalStorage.set({ key: QUOTES_ENABLED_KEY, value: enabled })
+  window.dispatchEvent(new Event(QUOTES_ENABLED_CHANGED_EVENT))
+  return enabled
+}
+export const useQuotesEnabled = () => {
+  const [enabled, setEnabled] = useState(getQuotesEnabled)
+  useEffect(() => addMyEventListener(QUOTES_ENABLED_CHANGED_EVENT, () => setEnabled(getQuotesEnabled())), [])
+  return enabled
+}
+
+const ensureEditableTemplateEnd =(template: string) => template.endsWith('\n') ? template : `${template}\n`
 export const applyNoteTemplate = (note: string, templateOverride?: string) => {
   const trimmed = note.trim()
   const template = templateOverride ?? getNoteTemplate()

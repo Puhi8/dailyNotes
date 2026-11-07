@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type BackupAccomplishmentChoice, type BackupConflictChoice, type BackupPullPreview, type BackupSyncStatus } from '../../data/api'
+import { api, type BackupAccomplishmentChoice, type BackupConflictChoice, type BackupPullPreview, type BackupQuoteChoice, type BackupSyncStatus } from '../../data/api'
 import { stripNoteMark } from '../../data/localCore'
 import { notifyNoteTemplateChanged } from '../../data/noteSettings'
 import type { StatusOptions } from '../../data/types'
@@ -28,6 +28,7 @@ type PullState = {
   preview: BackupPullPreview | null
   choices: Record<string, BackupConflictChoice | ''>
   accomplishmentChoice: BackupAccomplishmentChoice | ''
+  quoteChoice: BackupQuoteChoice | ''
 }
 
 type RemoteCredentialsState = {
@@ -60,7 +61,7 @@ export default function BackupSettings() {
   const [serverCredentials, setServerCredentials, resetServerCredentials] = useObjectState<RemoteCredentialsState>({
     password: '', passwordConfirm: '', currentServerPassword: '',
   })
-  const [pull, setPull, resetPull] = useObjectState<PullState>({ preview: null, choices: {}, accomplishmentChoice: '' })
+  const [pull, setPull, resetPull] = useObjectState<PullState>({ preview: null, choices: {}, accomplishmentChoice: '', quoteChoice: '' })
 
   useEffect(() => {
     if (!activePopup) return
@@ -130,7 +131,7 @@ export default function BackupSettings() {
       const preview = await api.backup.previewPull()
       const nextChoices: Record<string, BackupConflictChoice | ''> = {}
       for (const conflict of preview.conflicts) nextChoices[conflict.date] = ''
-      setPull({ preview, choices: nextChoices, accomplishmentChoice: '' })
+      setPull({ preview, choices: nextChoices, accomplishmentChoice: '', quoteChoice: '' })
       setActivePopup('pull')
     }
     catch (err) { setErrors({ backupPull: err instanceof Error ? err.message : 'Failed to fetch server snapshot.' }) }
@@ -141,15 +142,17 @@ export default function BackupSettings() {
     ? pull.preview.conflicts.filter(conflict => pull.choices[conflict.date] !== 'local' && pull.choices[conflict.date] !== 'remote').length
     : 0
   const unresolvedAccomplishmentChoice = pull.preview ? pull.accomplishmentChoice === '' : false
+  const quotesDiffer = pull.preview ? pull.preview.localOnlyQuotes + pull.preview.remoteOnlyQuotes + pull.preview.differingQuotes > 0 : false
+  const unresolvedQuoteChoice = quotesDiffer && pull.quoteChoice === ''
 
   const handleApplyPull = async () => {
     if (!pull.preview) return
-    if (unresolvedPullConflicts > 0) {
-      setErrors({ backupPull: 'Choose local or server data for each conflict day.' })
-      return
-    }
-    if (unresolvedAccomplishmentChoice) {
-      setErrors({ backupPull: 'Choose which accomplishments to keep.' })
+    const error = unresolvedPullConflicts > 0 ? "Choose local or server data for each conflict day."
+      : unresolvedAccomplishmentChoice ? "Choose which accomplishments to keep."
+        : unresolvedQuoteChoice ? "Choose which quotes to keep."
+            : null
+    if (error) {
+      setErrors({ remoteCredentials: error })
       return
     }
     const decisions: Record<string, BackupConflictChoice> = {}
@@ -157,7 +160,7 @@ export default function BackupSettings() {
     setErrors({ backupPull: null })
     setState({ applyingPull: true })
     try {
-      await api.backup.applyPull(pull.preview.remoteSnapshot, decisions, pull.accomplishmentChoice as BackupAccomplishmentChoice)
+      await api.backup.applyPull(pull.preview.remoteSnapshot, decisions, pull.accomplishmentChoice as BackupAccomplishmentChoice, pull.quoteChoice || "merge")
       notifyNoteTemplateChanged()
       closePullModal()
     }
@@ -183,20 +186,13 @@ export default function BackupSettings() {
     const password = serverCredentials.password
     const confirm = serverCredentials.passwordConfirm
 
-    if (!remoteSessionConnected) {
-      setErrors({ remoteCredentials: 'Sign in on the Login page first.' })
-      return
-    }
-    if (!currentPassword || !password || !confirm) {
-      setErrors({ remoteCredentials: 'Fill in all fields.' })
-      return
-    }
-    if (password.length > 1024) {
-      setErrors({ remoteCredentials: 'Password is too long.' })
-      return
-    }
-    if (password !== confirm) {
-      setErrors({ remoteCredentials: 'New passwords do not match.' })
+    const error = !remoteSessionConnected ? "Sign in on the Login page first."
+      : !currentPassword || !password || !confirm ? "Fill in all fields."
+        : password.length > 1024 ? "Password is too long."
+          : password !== confirm ? "New passwords do not match."
+            : null
+    if (error) {
+      setErrors({ remoteCredentials: error })
       return
     }
     setStatus({ remoteCredentials: 'saving' })
@@ -287,12 +283,16 @@ export default function BackupSettings() {
         preview: pull.preview,
         choices: pull.choices,
         accomplishmentChoice: pull.accomplishmentChoice,
+        quoteChoice: pull.quoteChoice,
       }}
       unresolvedConflicts={unresolvedPullConflicts}
       unresolvedAccomplishmentChoice={unresolvedAccomplishmentChoice}
+      quotesDiffer={quotesDiffer}
+      unresolvedQuoteChoice={unresolvedQuoteChoice}
       applying={state.applyingPull}
       error={errors.backupPull}
       onAccomplishmentChoiceChange={value => setPull({ accomplishmentChoice: value })}
+      onQuoteChoiceChange={value => setPull({ quoteChoice: value })}
       onConflictChoiceChange={(date, value) => setPull(previous => ({ choices: { ...previous.choices, [date]: value } }))}
       onApply={handleApplyPull}
       onClose={closePullModal}

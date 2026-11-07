@@ -1,6 +1,7 @@
 import { makeDayKey } from '../utils/functions'
 import { getDeviceValue, setDeviceValue } from './deviceStore'
 import { isPersistentRuntime } from '../utils/localProcessing'
+import { normalizeQuotes, type Quote } from './quotes'
 
 const LOCAL_DATA_KEY = 'dailynotes.localData.v1'
 
@@ -20,6 +21,7 @@ export type LocalState = {
     active: boolean
   }>
   days: Record<string, LocalDay>
+  quotes: Quote[]
 }
 
 export type DayData = Record<string, string | number | boolean | null>
@@ -41,6 +43,7 @@ export type NoteEntry = {
   date: string
   note: string
   marked: boolean
+  quotes: Quote[]
 }
 
 // The mark lives in the note text as its own line so backups carry it, and is stripped before anything is shown.
@@ -85,6 +88,7 @@ export type BackupSnapshot = {
     note: string
     data: DayData
   }>
+  quotes: Quote[]
 }
 
 const defaultLocalState = (): LocalState => ({
@@ -93,6 +97,7 @@ const defaultLocalState = (): LocalState => ({
   nextAccomplishmentId: 1,
   accomplishments: [],
   days: {},
+  quotes: [],
 })
 
 export const parseDayKey = (key: string) => {
@@ -148,6 +153,7 @@ const cloneLocalState = (state: LocalState): LocalState => ({
     normalizeDayKey(date),
     { note: String(day?.note ?? ''), data: cloneDayData((day?.data ?? {}) as DayData) }
   ])),
+  quotes: (state.quotes ?? []).map(quote => ({ ...quote })),
 })
 
 const normalizeLoadedLocalState = (input: Partial<LocalState>): LocalState => {
@@ -157,6 +163,7 @@ const normalizeLoadedLocalState = (input: Partial<LocalState>): LocalState => {
     nextAccomplishmentId: Number(input.nextAccomplishmentId ?? 1),
     accomplishments: Array.isArray(input.accomplishments) ? input.accomplishments : [],
     days: typeof input.days === 'object' && input.days ? input.days as Record<string, LocalDay> : {},
+    quotes: normalizeQuotes(input.quotes),
   })
   const byName = new Set<string>()
   let maxID = 0
@@ -323,6 +330,7 @@ const buildBackupSnapshot = (state: LocalState): BackupSnapshot => {
     noteTemplate: state.noteTemplate,
     accomplishments,
     days,
+    quotes: state.quotes,
   }
 }
 

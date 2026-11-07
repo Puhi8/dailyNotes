@@ -11,12 +11,14 @@ import {
   type DayData,
   type LocalState,
 } from './localCore'
+import { joinQuotes, normalizeQuotes, quoteEquals } from './quotes'
 import { fetchRemoteWithAuth } from './remoteAuth'
 
 const NOTE_TEMPLATE_KEY = 'dailynotes.noteTemplate'
 
 export type BackupConflictChoice = 'local' | 'remote'
 export type BackupAccomplishmentChoice = 'local' | 'remote' | 'merge'
+export type BackupQuoteChoice = BackupAccomplishmentChoice
 
 export type BackupSnapshotDay = {
   date: string
@@ -41,6 +43,10 @@ export type BackupPullPreview = {
   differingAccomplishments: number
   identicalAccomplishments: number
   accomplishmentOrderDiffers: boolean
+  localOnlyQuotes: number
+  remoteOnlyQuotes: number
+  differingQuotes: number
+  identicalQuotes: number
 }
 
 export type BackupPullResult = {
@@ -105,6 +111,7 @@ const normalizeSnapshot = (raw: unknown): BackupSnapshot => {
     noteTemplate,
     accomplishments: [...accomplishmentByName.values()],
     days: [...dayByDate.values()].sort((a, b) => compareDayKeys(a.date, b.date)),
+    quotes: normalizeQuotes(source.quotes),
   }
 }
 
@@ -118,6 +125,7 @@ const createSnapshotFromLocalState = (state: LocalState): BackupSnapshot => ({
     type: normalizeAccomplishmentType(item.type),
   })),
   days: Object.keys(state.days).sort(compareDayKeys).map(date => ({ date, note: state.days[date]?.note ?? '', data: cloneDayData(state.days[date]?.data ?? {}) })),
+  quotes: state.quotes,
 })
 
 const dayEquals = (left: BackupSnapshotDay, right: BackupSnapshotDay) => {
@@ -176,7 +184,27 @@ const buildPreview = (localSnapshot: BackupSnapshot, remoteSnapshot: BackupSnaps
   const remoteOrder = remoteAccomplishments.map(item => item.name.trim().toLowerCase()).filter(Boolean)
   const accomplishmentOrderDiffers = (localOrder.length !== remoteOrder.length || localOrder.some((name, index) => remoteOrder[index] !== name))
 
-  return { remoteSnapshot, conflicts, ...days, ...accomplishments, accomplishmentOrderDiffers }
+  const localQuotes = new Map(localSnapshot.quotes.map(quote => [quote.id, quote]))
+  const remoteQuotes = new Map(remoteSnapshot.quotes.map(quote => [quote.id, quote]))
+  const quotes = { localOnlyQuotes: 0, remoteOnlyQuotes: 0, differingQuotes: 0, identicalQuotes: 0 }
+  for (const id of new Set([...localQuotes.keys(), ...remoteQuotes.keys()])) {
+    const local = localQuotes.get(id)
+    const remote = remoteQuotes.get(id)
+    if (local && remote) {
+      if (quoteEquals(local, remote)) quotes.identicalQuotes += 1
+      else quotes.differingQuotes += 1
+    }
+    else if (local) quotes.localOnlyQuotes += 1
+    else quotes.remoteOnlyQuotes += 1
+  }
+
+  return { remoteSnapshot, conflicts, ...days, ...accomplishments, accomplishmentOrderDiffers, ...quotes }
+}
+
+const chooseQuotes = (localSnapshot: BackupSnapshot, remoteSnapshot: BackupSnapshot, choice: BackupQuoteChoice) => {
+  if (choice === 'local') return localSnapshot.quotes
+  if (choice === 'remote') return remoteSnapshot.quotes
+  return joinQuotes(localSnapshot.quotes, remoteSnapshot.quotes)
 }
 
 const mergeAccomplishments = (
@@ -216,6 +244,7 @@ const mergeSnapshots = (
   remoteSnapshot: BackupSnapshot,
   choices: Record<string, BackupConflictChoice>,
   accomplishmentChoice: BackupAccomplishmentChoice,
+  quoteChoice: BackupQuoteChoice,
 ): BackupSnapshot => {
   const localDays = new Map(localSnapshot.days.map(day => [day.date, day]))
   const remoteDays = new Map(remoteSnapshot.days.map(day => [day.date, day]))
@@ -249,6 +278,7 @@ const mergeSnapshots = (
     noteTemplate: remoteSnapshot.noteTemplate ?? '',
     accomplishments: mergeAccomplishments(localSnapshot, remoteSnapshot, mergedDays, accomplishmentChoice),
     days: mergedDays,
+    quotes: chooseQuotes(localSnapshot, remoteSnapshot, quoteChoice),
   }
 }
 
@@ -268,6 +298,7 @@ const snapshotToLocalState = (snapshot: BackupSnapshot): LocalState => {
     nextAccomplishmentId: accomplishments.length + 1,
     accomplishments,
     days,
+    quotes: snapshot.quotes,
   }
 }
 
@@ -282,12 +313,13 @@ export const applyBackupPull = async (
   remoteSnapshotRaw: BackupSnapshot,
   choices: Record<string, BackupConflictChoice>,
   accomplishmentChoice: BackupAccomplishmentChoice = 'merge',
+  quoteChoice: BackupQuoteChoice = 'merge',
 ): Promise<BackupPullResult> => {
   const remoteSnapshot = normalizeSnapshot(remoteSnapshotRaw)
   return runWithLocalStateWriteLock(async () => {
     const localSnapshot = createSnapshotFromLocalState(await loadLocalState())
     const preview = buildPreview(localSnapshot, remoteSnapshot)
-    const mergedSnapshot = mergeSnapshots(localSnapshot, remoteSnapshot, choices, accomplishmentChoice)
+    const mergedSnapshot = mergeSnapshots(localSnapshot, remoteSnapshot, choices, accomplishmentChoice, quoteChoice)
     const nextState = snapshotToLocalState(mergedSnapshot)
     await persistLocalState(nextState)
     manageLocalStorage.set({ key: NOTE_TEMPLATE_KEY, value: nextState.noteTemplate })

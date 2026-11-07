@@ -2,8 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import ErrorState from '../components/ErrorState'
 import NoteMarkdown from '../components/NoteMarkdown'
+import { QuoteCard } from '../components/QuoteParts'
 import { api, type NoteEntry } from '../data/api'
-import { getNoteSwipe } from '../data/noteSettings'
+import { getNoteSwipe, getQuotesEnabled } from '../data/noteSettings'
 import { useSecurityReauthSettings } from '../data/securitySettings'
 import { useSecurity } from '../security'
 import { ToggleSwitch } from '../utils/simplifyReact'
@@ -15,9 +16,15 @@ type SwipeGesture = { x: number; y: number; time: number; axis: 'x' | 'y' | null
 const SWIPE_MS = 100
 const SWIPE_AXIS_LOCK_PX = 8
 
-const noteBody = (entry: NoteEntry) => entry.note.trim()
-  ? <NoteMarkdown text={entry.note} />
-  : <div className="noteEmpty">No note text.</div>
+const noteBody = (entry: NoteEntry) => <>
+  {entry.note.trim()
+    ? <NoteMarkdown text={entry.note} />
+    : <div className="noteEmpty">No note text.</div>}
+  {getQuotesEnabled() && entry.quotes.length > 0 && <div className="quoteList noteQuotes">
+    <h2 className="panelTitle">Quotes</h2>
+    {entry.quotes.map(quote => <QuoteCard key={quote.id} quote={quote} showDetails />)}
+  </div>}
+</>
 
 export default function NoteDetail() {
   const { date } = useParams()
@@ -27,6 +34,7 @@ export default function NoteDetail() {
   const swipeEnabled = getNoteSwipe()
   const [note, setNote] = useState<NoteEntry | null>(null)
   const [pages, setPages] = useState<SwipePage[]>([])
+  const [neighbors, setNeighbors] = useState<{ older?: string, newer?: string }>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [markError, setMarkError] = useState<string | null>(null)
@@ -57,6 +65,7 @@ export default function NoteDetail() {
         setNote(result)
         // Newer notes sit on the left, like the newest-first calendar.
         setPages([newerPage, { date: result.date, note: result }, olderPage].filter(page => page != null))
+        setNeighbors({ older, newer })
         setMarkError(null)
       })
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Request failed') })
@@ -171,6 +180,10 @@ export default function NoteDetail() {
       <p>{note.date}</p>
     </header>
     <section className="panelCard panelStack">
+      {(neighbors.newer || neighbors.older) && <nav className="noteNav" aria-label="Move between notes">
+        {neighbors.newer && <Link className="stateButton stateButtonSecondary" to={`/notes/${neighbors.newer}`} replace>‹ Newer</Link>}
+        {neighbors.older && <Link className="stateButton stateButtonSecondary noteNavOlder" to={`/notes/${neighbors.older}`} replace>Older ›</Link>}
+      </nav>}
       {marksVisible && <div className="panelRow">
         <span>Marked</span>
         <span className="panelRowValue panelRowValueToggle">

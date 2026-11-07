@@ -1,4 +1,5 @@
 import type { ServerData } from './types'
+import { isDayQuote } from './quotes'
 import {
   cloneDayData,
   compareDayKeys,
@@ -204,7 +205,9 @@ export async function getDashboardData(): Promise<ServerData> {
 
 export async function listNotes(): Promise<NoteSummary[]> {
   const state = await loadLocalState()
-  return Object.keys(state.days)
+  // A day holding only a quote still opens from the calendar, so the quote can be traced back to it.
+  const quoteDates = state.quotes.filter(quote => isDayQuote(quote, quote.date)).map(quote => quote.date)
+  return [...new Set([...Object.keys(state.days), ...quoteDates])]
     .sort(compareDayKeys)
     .reverse()
     .map(date => {
@@ -235,5 +238,16 @@ export async function fetchNote(date: string): Promise<NoteEntry> {
   const state = await loadLocalState()
   const key = normalizeDayKey(date)
   const note = state.days[key]?.note ?? ''
-  return { date: key, note: stripNoteMark(note), marked: hasNoteMark(note) }
+  return { date: key, note: stripNoteMark(note), marked: hasNoteMark(note), quotes: state.quotes.filter(quote => isDayQuote(quote, key)) }
+}
+
+export async function listQuotes() {
+  const state = await loadLocalState()
+  return state.quotes.sort((left, right) => right.addedAt.localeCompare(left.addedAt))
+}
+
+export async function listDayQuotes(date: string) {
+  const state = await loadLocalState()
+  const key = normalizeDayKey(date)
+  return state.quotes.filter(quote => isDayQuote(quote, key))
 }

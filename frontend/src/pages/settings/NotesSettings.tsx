@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import MarkdownEditor from '../../components/MarkdownEditor'
-import { getNoteHeaderColors, getNoteLengthShade, getNoteSwipe, getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi, setNoteHeaderColors, setNoteLengthShade, setNoteSwipe, subscribeNoteTemplateChange } from '../../data/noteSettings'
+import { getNoteHeaderColors, getNoteLengthShade, getNoteSwipe, getNoteTemplate, loadNoteTemplateFromApi, saveNoteTemplateToApi, setNoteHeaderColors, setNoteLengthShade, setNoteSwipe, setQuotesEnabled, subscribeNoteTemplateChange, useQuotesEnabled } from '../../data/noteSettings'
 import type { StatusOptions } from '../../data/types'
 import { Button, ToggleSwitch } from '../../utils/simplifyReact'
 import { SettingsSection } from './SettingsShared'
@@ -10,6 +10,7 @@ export default function NotesSettings() {
   const [colorNoteHeadings, setColorNoteHeadingsState] = useState(() => getNoteHeaderColors())
   const [shadeByLength, setShadeByLength] = useState(() => getNoteLengthShade())
   const [swipeNotes, setSwipeNotes] = useState(() => getNoteSwipe())
+  const quotesEnabled = useQuotesEnabled()
   const [status, setStatus] = useState<StatusOptions>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -80,6 +81,17 @@ export default function NotesSettings() {
           ariaLabel="Toggle swiping between notes"
           checked={swipeNotes}
           onChange={() => setSwipeNotes(setNoteSwipe(!swipeNotes))}
+        />
+      </span>
+    </div>
+    <div className="panelRow">
+      <span>Quotes (tab, day input and notes)</span>
+      <span className="panelRowValue panelRowValueToggle">
+        {quotesEnabled ? 'Enabled' : 'Disabled'}
+        <ToggleSwitch
+          ariaLabel="Toggle quotes"
+          checked={quotesEnabled}
+          onChange={() => setQuotesEnabled(!quotesEnabled)}
         />
       </span>
     </div>

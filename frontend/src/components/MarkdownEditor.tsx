@@ -18,6 +18,8 @@ const rules: Rule[] = [
   { className: 'mdHeading2', pattern: /^##[ \t]+[^\n]*/my },
   { className: 'mdHeading3', pattern: /^###[ \t]+[^\n]*/my },
   { className: 'mdHeading4', pattern: /^####[ \t]+[^\n]*/my },
+  { className: 'mdQuoteLine', pattern: /^>[^\n]*/my },
+  { className: 'mdQuoteNoteLine', pattern: /^--(?:[ \t][^\n]*)?$/my },
   { className: 'mdCode', pattern: /`[^`\n]+`/y },
   { className: 'mdStrong', pattern: /\*\*[^*\n]+?\*\*/y },
   { className: 'mdStrong', pattern: /__[^_\n]+?__/y },
@@ -28,7 +30,7 @@ const rules: Rule[] = [
 ]
 
 const nextPlainTextEnd = (text: string, start: number) => {
-  const next = text.slice(start + 1).search(/[`~*_#h]/)
+  const next = text.slice(start + 1).search(/[`~*_#h>-]/)
   return next === -1 ? text.length : start + next + 1
 }
 
@@ -98,7 +100,7 @@ const saveCursor = (root: HTMLElement): Cursor | null => {
   }
 }
 
-const nodeAtOffset = (root: HTMLElement, offset: number) => {
+export const nodeAtOffset = (root: HTMLElement, offset: number) => {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let remaining = offset
   let node = walker.nextNode()
@@ -112,7 +114,7 @@ const nodeAtOffset = (root: HTMLElement, offset: number) => {
   return { node: root, offset: root.childNodes.length }
 }
 
-const restoreCursor = (root: HTMLElement, cursor: Cursor) => {
+export const restoreCursor = (root: HTMLElement, cursor: Cursor) => {
   const selection = window.getSelection()
   if (!selection) return
   const start = nodeAtOffset(root, cursor.start)

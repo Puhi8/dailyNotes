@@ -17,6 +17,7 @@ import {
   normalizeDayKey,
   withNoteMark,
 } from './localCore'
+import { cleanQuoteField, reconcileDayQuotes, type QuoteFields, type QuoteStatus } from './quotes'
 
 export type SaveDayPayload = Partial<Pick<IndividualDayResponse, 'data' | 'note'>>
 
@@ -82,6 +83,48 @@ export async function saveIndividualDay(date: string, payload: SaveDayPayload): 
   const dateKey = normalizeDayKey(date)
   if (!dayKey.isEditable(dateKey)) throw new Error(`${dateKey} is closed for editing.`)
   return withLocalStateWrite(async state => (await saveDayPayload(state, dateKey, payload)))
+}
+
+// Quotes are independent from the day: saving them neither writes the day nor checks if it is closed for editing.
+export async function saveDayQuotes(date: string, fields: QuoteFields[]) {
+  return withLocalStateWrite(async state => {
+    state.quotes = reconcileDayQuotes(state.quotes, normalizeDayKey(date), fields, new Date().toISOString())
+    await persistLocalState(state)
+  })
+}
+
+export async function editQuote(id: string, fields: QuoteFields) {
+  const text = cleanQuoteField(fields.text)
+  const note = cleanQuoteField(fields.note)
+  if (!text) throw new Error("A quote needs text.")
+  return withLocalStateWrite(async state => {
+    const quote = state.quotes.find(entry => entry.id === id)
+    if (!quote) throw new Error("Quote not found.")
+    if (quote.text === text && quote.note === note) return
+    quote.text = text
+    quote.note = note
+    quote.updatedAt = new Date().toISOString()
+    await persistLocalState(state)
+  })
+}
+
+export async function setQuoteStatus(id: string, status: QuoteStatus, deniedReason = "") {
+  return withLocalStateWrite(async state => {
+    const quote = state.quotes.find(entry => entry.id === id)
+    if (!quote) throw new Error("Quote not found.")
+    if (status === "denied" && !deniedReason.trim()) throw new Error("A denied quote needs a reason.")
+    quote.status = status
+    quote.deniedReason = status === "denied" ? deniedReason.trim() : ""
+    quote.updatedAt = new Date().toISOString()
+    await persistLocalState(state)
+  })
+}
+
+export async function deleteQuote(id: string) {
+  return withLocalStateWrite(async state => {
+    state.quotes = state.quotes.filter(quote => quote.id !== id)
+    await persistLocalState(state)
+  })
 }
 
 // A mark is not an edit of the day, so it also works on days closed for editing.

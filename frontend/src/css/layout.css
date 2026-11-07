@@ -28,7 +28,7 @@ html.platform-android .navbar {
   gap: 10px;
 }
 
-.navLinks a {
+:is(.navLinks a, .dayTabs > button) {
   text-decoration: none;
   color: var(--muted);
   padding: 6px 12px;
@@ -41,10 +41,23 @@ html.platform-android .navbar {
   display: none;
 }
 
-.navLinks a.active {
+:is(.navLinks a.active, .dayTabs > button.active) {
   color: var(--text);
   border-color: var(--panel-edge);
   background: var(--panel-strong);
+}
+
+.dayTabs {
+  display: flex;
+  gap: 10px;
+}
+
+.dayTabs > button {
+  flex: 1;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
 }
 
 .appContent {

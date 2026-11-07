@@ -8,12 +8,14 @@ import { useAndroidBackButton } from './utils/hardwareBack'
 import { eventListener, makeDayKey } from './utils/functions'
 import { getAndroidPrivacyModeEnabled, PRIVACY_SETTINGS_CHANGED_EVENT } from './data/privacy'
 import { useSecurityReauthSettings } from './data/securitySettings'
+import { useQuotesEnabled } from './data/noteSettings'
 
 const Login = lazy(() => import('./pages/Login'))
 const Home = lazy(() => import('./home'))
 const Accomplishments = lazy(() => import('./pages/Accomplishments'))
 const Notes = lazy(() => import('./pages/Notes'))
 const NoteDetail = lazy(() => import('./pages/NoteDetail'))
+const Quotes = lazy(() => import('./pages/Quotes'))
 const Settings = lazy(() => import('./pages/Settings'))
 const SingleDay = lazy(() => import('./pages/SingleDay'))
 
@@ -140,6 +142,7 @@ type LockedRoute = {
 
 const lockedRouts: LockedRoute[] = [
   { path: "/day/:date", item: <SingleDay /> },
+  { path: "/quotes", item: <QuotesGate /> },
   { path: "/notes", item: <Notes /> },
   { path: "/notes/:date", item: <NoteDetailGate /> },
   { path: "/accomplishments", item: <Accomplishments /> },
@@ -157,13 +160,12 @@ type NavbarItem = {
   text: string
   shortText: string
   link: string
-  activePath?: () => string
 }
 
 const navbarItems: NavbarItem[] = [
   { text: "Home", shortText: "Home", link: "/" },
-  { text: "Today", shortText: "Today", link: "/today", activePath: () => dayPath(0) },
-  { text: "Yesterday", shortText: "Yest.", link: "/yesterday", activePath: () => dayPath(1) },
+  { text: "Day", shortText: "Day", link: "/day" },
+  { text: "Quotes", shortText: "Quotes", link: "/quotes" },
   { text: "Notes", shortText: "Notes", link: "/notes" },
   { text: "Accomplishments", shortText: "Accom.", link: "/accomplishments" },
   { text: "Settings", shortText: "Sett.", link: "/settings" },
@@ -172,16 +174,14 @@ const navbarItems: NavbarItem[] = [
 function AppShell() {
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+  const quotesEnabled = useQuotesEnabled()
+  const visibleNavbarItems = navbarItems.filter(item => quotesEnabled || item.link !== "/quotes")
 
   return <div className="appShell">
     {isAuthenticated && location.pathname !== '/login' && <nav className="navbar">
       <div className="navLinks">
-        {navbarItems.map(item => (
-          <NavLink
-            key={item.link}
-            to={item.link}
-            className={({ isActive }) => (isActive || item.activePath?.() === location.pathname ? 'active' : undefined)}
-          >
+        {visibleNavbarItems.map(item => (
+          <NavLink key={item.link} to={item.link}>
             <span className="navLabelFull">{item.text}</span>
             <span className="navLabelShort">{item.shortText}</span>
           </NavLink>
@@ -192,8 +192,7 @@ function AppShell() {
       <Suspense fallback={<div className="state">Loading...</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/today" element={<DayRedirect daysAgo={0} />} />
-          <Route path="/yesterday" element={<DayRedirect daysAgo={1} />} />
+          <Route path="/day" element={<DayRedirect daysAgo={0} />} />
           <Route
             path="/"
             element={<ProtectedAppRoute><Home /></ProtectedAppRoute>}
@@ -255,6 +254,19 @@ function NoteDetailGate() {
     {/* Preact remounts everything up to the nearest Suspense while a lazy page loads, which would forget this unlock */}
     <Suspense fallback={<div className="state">Loading...</div>}>
       <NoteDetail />
+    </Suspense>
+  </RequireReauth>
+}
+
+// Shows the text of every day at once, so it gets the same check as opening a single note.
+function QuotesGate() {
+  return <RequireReauth
+    title="Confirm quotes access"
+    message="Confirm your PIN or fingerprint to view your quotes."
+    reauthMoment="internal"
+  >
+    <Suspense fallback={<div className="state">Loading...</div>}>
+      <Quotes />
     </Suspense>
   </RequireReauth>
 }

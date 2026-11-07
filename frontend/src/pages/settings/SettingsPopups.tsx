@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react'
-import type { BackupAccomplishmentChoice, BackupConflictChoice, BackupPullPreview } from '../../data/api'
+import type { BackupAccomplishmentChoice, BackupConflictChoice, BackupPullPreview, BackupQuoteChoice } from '../../data/api'
 import type { StatusOptions } from '../../data/types'
 import { Button, LockInput, ModalShell } from '../../utils/simplifyReact'
 
@@ -19,6 +19,7 @@ type PullValues = {
   preview: BackupPullPreview
   choices: Record<string, BackupConflictChoice | ''>
   accomplishmentChoice: BackupAccomplishmentChoice | ''
+  quoteChoice: BackupQuoteChoice | ''
 }
 
 type ServerPopupConfig = {
@@ -52,9 +53,12 @@ type PullPopupConfig = {
   values: PullValues
   unresolvedConflicts: number
   unresolvedAccomplishmentChoice: boolean
+  quotesDiffer: boolean
+  unresolvedQuoteChoice: boolean
   applying: boolean
   error: string | null
   onAccomplishmentChoiceChange: (value: BackupAccomplishmentChoice | '') => void
+  onQuoteChoiceChange: (value: BackupQuoteChoice | '') => void
   onConflictChoiceChange: (date: string, value: BackupConflictChoice | '') => void
   onApply: () => void
   onClose: () => void
@@ -174,9 +178,12 @@ export function PullPopup({
   values,
   unresolvedConflicts,
   unresolvedAccomplishmentChoice,
+  quotesDiffer,
+  unresolvedQuoteChoice,
   applying,
   error,
   onAccomplishmentChoiceChange,
+  onQuoteChoiceChange,
   onConflictChoiceChange,
   onApply,
   onClose,
@@ -205,6 +212,20 @@ export function PullPopup({
       <option value="remote">Keep server accomplishments</option>
       <option value="merge">Merge both accomplishments</option>
     </select>
+    <div className="stateMeta">
+      Quotes - Different: {preview.differingQuotes}, Local-only: {preview.localOnlyQuotes}, Server-only: {preview.remoteOnlyQuotes}, Identical: {preview.identicalQuotes}
+    </div>
+    {quotesDiffer && <select
+      className="lockInput"
+      aria-label="Quotes source"
+      value={values.quoteChoice}
+      onChange={event => onQuoteChoiceChange(event.target.value as BackupQuoteChoice | '')}
+    >
+      <option value="">Choose quotes source</option>
+      <option value="local">Keep only local quotes</option>
+      <option value="remote">Keep only server quotes</option>
+      <option value="merge">Join both (every quote from both sides)</option>
+    </select>}
     {preview.conflicts.length > 0
       ? <div className="backupConflictList">
         {preview.conflicts.map(conflict => (
@@ -228,11 +249,12 @@ export function PullPopup({
     }
     {unresolvedConflicts > 0 && <div className="stateMeta">Unresolved day conflicts: {unresolvedConflicts}</div>}
     {unresolvedAccomplishmentChoice && <div className="stateMeta">Unresolved accomplishment choice.</div>}
+    {unresolvedQuoteChoice && <div className="stateMeta">Unresolved quote choice.</div>}
     {error && <div className="stateMeta stateMetaError">{error}</div>}
     <div className="lockActions">
       <Button.primary
         onClick={onApply}
-        disabled={applying || unresolvedConflicts > 0 || unresolvedAccomplishmentChoice}
+        disabled={applying || unresolvedConflicts > 0 || unresolvedAccomplishmentChoice || unresolvedQuoteChoice}
       >
         {applying ? 'Applying...' : 'Apply pull'}
       </Button.primary>

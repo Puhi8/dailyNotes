@@ -96,7 +96,7 @@ export default function Home() {
       {data.stats[1] ? DisplayStats(data.stats[1]) : null}
     </div>
     <div className="homeActions">
-      <Link className="stateButton" to="/today">Finish the day</Link>
+      <Link className="stateButton" to="/day">Finish the day</Link>
     </div>
     <Suspense fallback={<div className="chartCard">Loading graphs...</div>}>
       <HomeGraphs data={data} />

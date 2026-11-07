@@ -38,6 +38,17 @@ type AccomplishmentsRow struct {
 	Active           sql.NullBool
 }
 
+type QuoteRow struct {
+	ID           string
+	Text         string
+	Note         string
+	Date         string
+	AddedAt      string
+	UpdatedAt    string
+	Status       string
+	DeniedReason string
+}
+
 func InitDatabase(dbPath string) error {
 	if info, err := os.Stat(dbPath); err == nil && info.IsDir() {
 		dbPath = filepath.Join(dbPath, "daily_notes.db")
@@ -445,6 +456,31 @@ func GetAllAccomplishments(_ int64) ([]AccomplishmentsRow, error) {
 	for rows.Next() {
 		var row AccomplishmentsRow
 		if err := rows.Scan(&row.AccomplishmentID, &row.Name, &row.Type, &row.Active); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func GetAllQuotes() ([]QuoteRow, error) {
+	rows, err := DB.Query(`
+		SELECT quote_id, quote_text, quote_note, date, added_at, updated_at, status, denied_reason
+		FROM quotes
+		ORDER BY added_at;
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]QuoteRow, 0)
+	for rows.Next() {
+		var row QuoteRow
+		if err := rows.Scan(&row.ID, &row.Text, &row.Note, &row.Date, &row.AddedAt, &row.UpdatedAt, &row.Status, &row.DeniedReason); err != nil {
 			return nil, err
 		}
 		results = append(results, row)

@@ -25,6 +25,17 @@ CREATE TABLE IF NOT EXISTS day_accomplishments (
    FOREIGN KEY (day_id) REFERENCES days (day_id) ON DELETE CASCADE,
    FOREIGN KEY (accomplishment_id) REFERENCES accomplishments (accomplishment_id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS quotes (
+   quote_id TEXT PRIMARY KEY,
+   quote_text TEXT NOT NULL,
+   quote_note TEXT NOT NULL DEFAULT '',
+   date DATE NOT NULL,
+   added_at TEXT NOT NULL,
+   updated_at TEXT NOT NULL,
+   status VARCHAR(10) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'denied')),
+   denied_reason TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_quotes_date ON quotes (date);
 CREATE INDEX IF NOT EXISTS idx_days_date ON days (date);
 CREATE INDEX IF NOT EXISTS idx_dayacc_day ON day_accomplishments (day_id);
 CREATE INDEX IF NOT EXISTS idx_dayacc_acc ON day_accomplishments (accomplishment_id);

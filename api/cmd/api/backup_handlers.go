@@ -23,6 +23,8 @@ const (
 	maxBackupTypeBytes               = 50
 	maxBackupKeyBytes                = 200
 	maxBackupStringValueBytes        = 4096
+	maxBackupQuotes                  = 20000
+	maxBackupQuoteIDBytes            = 64
 )
 
 type backupSnapshot struct {
@@ -31,6 +33,8 @@ type backupSnapshot struct {
 	NoteTemplate    string                 `json:"noteTemplate"`
 	Accomplishments []backupAccomplishment `json:"accomplishments"`
 	Days            []backupDay            `json:"days"`
+	// Missing (nil) from clients older than quotes, which must not wipe quotes they cannot see.
+	Quotes []backupQuote `json:"quotes"`
 }
 
 type backupAccomplishment struct {
@@ -43,6 +47,17 @@ type backupDay struct {
 	Date string         `json:"date"`
 	Note string         `json:"note"`
 	Data map[string]any `json:"data"`
+}
+
+type backupQuote struct {
+	ID           string `json:"id"`
+	Text         string `json:"text"`
+	Note         string `json:"note"`
+	Date         string `json:"date"`
+	AddedAt      string `json:"addedAt"`
+	UpdatedAt    string `json:"updatedAt"`
+	Status       string `json:"status"`
+	DeniedReason string `json:"deniedReason"`
 }
 
 func handleGetBackupSnapshot(writer http.ResponseWriter, req *http.Request, userID int64) {
@@ -63,6 +78,15 @@ func handleGetBackupSnapshot(writer http.ResponseWriter, req *http.Request, user
 	if err != nil {
 		http.Error(writer, "Failed to load days", http.StatusInternalServerError)
 		return
+	}
+	quoteRows, err := db.GetAllQuotes()
+	if err != nil {
+		http.Error(writer, "Failed to load quotes", http.StatusInternalServerError)
+		return
+	}
+	quotes := make([]backupQuote, 0, len(quoteRows))
+	for _, row := range quoteRows {
+		quotes = append(quotes, backupQuote(row))
 	}
 
 	accomplishments := make([]backupAccomplishment, 0, len(accomplishmentsRows))
@@ -118,6 +142,7 @@ func handleGetBackupSnapshot(writer http.ResponseWriter, req *http.Request, user
 		NoteTemplate:    template,
 		Accomplishments: accomplishments,
 		Days:            days,
+		Quotes:          quotes,
 	}
 	res, err := json.Marshal(payload)
 	if err != nil {
@@ -244,6 +269,27 @@ func importBackupSnapshot(payload backupSnapshot) error {
 		}
 	}
 
+	if payload.Quotes != nil {
+		if _, err := tx.Exec(`DELETE FROM quotes`); err != nil {
+			return err
+		}
+		for _, quote := range payload.Quotes {
+			if _, err := tx.Exec(
+				`INSERT INTO quotes (quote_id, quote_text, quote_note, date, added_at, updated_at, status, denied_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				quote.ID,
+				quote.Text,
+				quote.Note,
+				quote.Date,
+				quote.AddedAt,
+				quote.UpdatedAt,
+				quote.Status,
+				quote.DeniedReason,
+			); err != nil {
+				return err
+			}
+		}
+	}
+
 	return tx.Commit()
 }
 
@@ -345,7 +391,61 @@ func validateAndNormalizeBackupSnapshot(payload *backupSnapshot) error {
 	}
 	payload.Days = days
 
+	quotes, err := normalizeBackupQuotes(payload.Quotes)
+	if err != nil {
+		return err
+	}
+	payload.Quotes = quotes
+
 	return nil
+}
+
+func normalizeBackupQuotes(input []backupQuote) ([]backupQuote, error) {
+	if input == nil {
+		return nil, nil
+	}
+	if len(input) > maxBackupQuotes {
+		return nil, fmt.Errorf("too many quotes (max %d)", maxBackupQuotes)
+	}
+	quotes := make([]backupQuote, 0, len(input))
+	seenIDs := make(map[string]struct{}, len(input))
+	for _, quote := range input {
+		quote.ID = strings.TrimSpace(quote.ID)
+		quote.Text = strings.TrimSpace(quote.Text)
+		quote.Note = strings.TrimSpace(quote.Note)
+		quote.Date = strings.TrimSpace(quote.Date)
+		quote.DeniedReason = strings.TrimSpace(quote.DeniedReason)
+		if quote.ID == "" || len(quote.ID) > maxBackupQuoteIDBytes {
+			return nil, fmt.Errorf("invalid quote id: %q", quote.ID)
+		}
+		if _, exists := seenIDs[quote.ID]; exists {
+			continue
+		}
+		seenIDs[quote.ID] = struct{}{}
+		if quote.Text == "" {
+			return nil, fmt.Errorf("empty quote text for %s", quote.ID)
+		}
+		if len(quote.Text) > maxBackupNoteBytes || len(quote.Note) > maxBackupNoteBytes || len(quote.DeniedReason) > maxBackupNoteBytes {
+			return nil, fmt.Errorf("quote too large: %s", quote.ID)
+		}
+		if _, err := time.Parse("06-01-02", quote.Date); err != nil {
+			return nil, fmt.Errorf("invalid quote date: %q", quote.Date)
+		}
+		for _, timestamp := range []string{quote.AddedAt, quote.UpdatedAt} {
+			if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+				return nil, fmt.Errorf("invalid quote time: %q", timestamp)
+			}
+		}
+		switch quote.Status {
+		case "active", "hidden":
+			quote.DeniedReason = ""
+		case "denied":
+		default:
+			return nil, fmt.Errorf("invalid quote status: %q", quote.Status)
+		}
+		quotes = append(quotes, quote)
+	}
+	return quotes, nil
 }
 
 func normalizeBackupDayData(input map[string]any, strict bool) (map[string]any, error) {

@@ -23,6 +23,12 @@
 - Existing `localStorage` data is migrated automatically on first load.
 - Remote API is optional and used only for backup/auth/sync features.
 
+## Quotes
+- Written below the note on the Day page: `> the quote` and `-- an extra note`. The Add quote button inserts both lines.
+- Stored apart from the days, each with the day it belongs to and the time it was added. The Quotes tab can edit, hide, deny (with a reason), restore or delete them at any time, and shows when each was last changed.
+- Settings > Notes turns the whole feature off; existing quotes stay saved and keep syncing.
+- Backups with quotes need an updated API, because older servers reject them. Update the server before the apps.
+
 ## Protected routes
 - Set `VITE_SECURE_PIN` to enable the PIN unlock for `/settings`, `/yesterday`, `/notes`
 

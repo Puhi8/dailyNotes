@@ -1,11 +1,12 @@
 import { getBackupSyncStatus, isBackupAutoSyncEnabled, setBackupAutoSyncEnabled, subscribeBackupSyncStatus, syncBackupNow } from './backupSync'
 import { applyBackupPull, previewBackupPull } from './backupPull'
-import { fetchNote, getDashboardData, getIndividualDay, getNoteTemplate, listAccomplishments, listNotes } from './localRead'
-import { createAccomplishment, deleteAccomplishment, renameAccomplishment, reorderAccomplishments, saveIndividualDay, saveNoteTemplate, setAccomplishmentActive, setNoteMarked } from './localWrite'
+import { fetchNote, getDashboardData, getIndividualDay, getNoteTemplate, listAccomplishments, listDayQuotes, listNotes, listQuotes } from './localRead'
+import { createAccomplishment, deleteAccomplishment, deleteQuote, editQuote, renameAccomplishment, reorderAccomplishments, saveDayQuotes, saveIndividualDay, saveNoteTemplate, setAccomplishmentActive, setNoteMarked, setQuoteStatus } from './localWrite'
 import { DEFAULT_API_BASE_URL, apiBaseUrl, login, logout, subscribeAuthChanges, updateRemoteCredentials, authSession } from './remoteAuth'
 export type { SaveDayPayload } from './localWrite'
 export type { BackupSyncStatus } from './backupSync'
-export type { BackupConflictChoice, BackupAccomplishmentChoice, BackupPullConflict, BackupPullPreview, BackupPullResult } from './backupPull'
+export type { BackupConflictChoice, BackupAccomplishmentChoice, BackupQuoteChoice, BackupPullConflict, BackupPullPreview, BackupPullResult } from './backupPull'
+export type { Quote, QuoteStatus } from './quotes'
 
 export type {
   DayData,
@@ -60,5 +61,13 @@ export const api = {
     setActive: setAccomplishmentActive,
     delete: deleteAccomplishment,
     reorder: reorderAccomplishments,
+  },
+  quotes: {
+    list: listQuotes,
+    listForDay: listDayQuotes,
+    saveForDay: saveDayQuotes,
+    edit: editQuote,
+    setStatus: setQuoteStatus,
+    delete: deleteQuote,
   },
 } as const

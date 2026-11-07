@@ -102,4 +102,4 @@ jobs:
             VITE_ROUTER_MODE=hash VITE_PUBLIC_BASE_PATH=/dailyNotes/ npm run build &&
             npx gh-pages -d dist -u "github-actions <github-actions@github.com>"
             -r "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-        run: ./release.sh "${{ needs.check.outputs.tag }}"
+        run: ./.github/workflows/release.sh "${{ needs.check.outputs.tag }}"

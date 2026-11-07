@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import ErrorState from '../components/ErrorState'
 import MarkdownEditor from '../components/MarkdownEditor'
+import QuoteInput from '../components/QuoteInput'
 import { api, type DayData } from '../data/api'
 import { dayKey, hasNoteMark, normalizeDayKey, openDayEdit, parseDayKey, stripNoteMark, withNoteMark } from '../data/localCore'
-import { applyNoteTemplate, resolveNoteTemplate } from '../data/noteSettings'
+import { applyNoteTemplate, resolveNoteTemplate, useQuotesEnabled } from '../data/noteSettings'
 import type { StatusOptions } from '../data/types'
 import { useObjectState } from '../utils/functions'
 import { saveIndividualDay } from '../data/localWrite'
@@ -31,9 +32,38 @@ type errorState = {
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 700
+const dayTabs = [
+  { label: "Today", getDate: dayKey.today },
+  { label: "Yesterday", getDate: dayKey.yesterday }
+]
+
 export default function SingleDay() {
   // Pinned by the URL, never read from the clock, so a session running past midnight stays on one day.
   const date = normalizeDayKey(useParams().date ?? '')
+  const navigate = useNavigate()
+
+  return <div className="page">
+    <div className="dayTabs">
+      {dayTabs.map(tab => (
+        <button
+          key={tab.label}
+          className={tab.getDate() === date ? "active" : undefined}
+          aria-pressed={tab.getDate() === date}
+          // Read on click, not on render: this stays mounted while typing, so a rendered date could be from before midnight.
+          onClick={() => navigate(`/day/${tab.getDate()}`, { replace: true })}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+    <header className="pageHeader"><h1>{date}</h1></header>
+    {/* A new key per date: the save logic holds one date in its closures and refs, so sharing an instance could write one day over the other. */}
+    <DayEditor key={date} date={date} />
+  </div>
+}
+
+function DayEditor({ date }: { date: string }) {
+  const quotesEnabled = useQuotesEnabled()
   const [data, setData] = useObjectState<fetchedData<DayData>>({ main: {}, original: {} })
   const [note, setNote] = useObjectState<fetchedData<string>>({ main: "", original: "" })
   const [isLoading, setIsLoading] = useState(true)
@@ -79,6 +109,8 @@ export default function SingleDay() {
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => {
       cancelled = true
+      // Switching tabs right after an edit must not drop it. Before closeEditSession, which can make the day read-only.
+      void handleSave()
       closeEditSession()
       if (saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current)
@@ -163,56 +195,54 @@ export default function SingleDay() {
   }, [data.main, handleSave, isDirty, note.main])
 
   if (errors.load) return <ErrorState error={errors.load} onReload={() => window.location.reload()} />
-  if (isLoading) return <div className="state">Loading {date}...</div>
+  if (isLoading) return <div className="panelEmpty">Loading {date}...</div>
 
-  return <div className="page">
-    <header className="pageHeader"><h1>{date}</h1></header>
-    <section className="panelCard panelStack">
-      <div className="panelSection">
-        <h2 className="panelTitle">Checklist</h2>
-        {entries.length === 0
-          ? <div className="panelEmpty">No entries for {date}.</div>
-          : <div className="editorList"> {
-            entries.map(([key, value]) => (
-              <div className="editorRow" key={key}>
-                <span className="editorLabel">{key}</span>
-                {typeof value === 'boolean'
-                  ? <label className="editorSwitch">
-                    <input
-                      className="editorSwitchInput"
-                      type="checkbox"
-                      checked={Boolean(value)}
-                      onChange={event => updateValue(key, event.target.checked)}
-                    />
-                    <span className="editorSwitchSlider" aria-hidden="true" />
-                  </label>
-                  : <input
-                    className="editorInput"
-                    type="text"
-                    value={value == null ? '' : String(value)}
-                    onChange={event => updateValue(key, event.target.value)}
+  return <section className="panelCard panelStack">
+    <div className="panelSection">
+      <h2 className="panelTitle">Checklist</h2>
+      {entries.length === 0
+        ? <div className="panelEmpty">No entries for {date}.</div>
+        : <div className="editorList"> {
+          entries.map(([key, value]) => (
+            <div className="editorRow" key={key}>
+              <span className="editorLabel">{key}</span>
+              {typeof value === 'boolean'
+                ? <label className="editorSwitch">
+                  <input
+                    className="editorSwitchInput"
+                    type="checkbox"
+                    checked={Boolean(value)}
+                    onChange={event => updateValue(key, event.target.checked)}
                   />
-                }
-              </div>
-            ))}
-          </div>
-        }
-      </div>
-      <div className="panelSection noteInputSection">
-        <h2 className="panelTitle">Note (.md)</h2>
-        <MarkdownEditor
-          className="noteMarkdownEditor"
-          value={note.main}
-          placeholder={`Write the markdown note for ${date}.`}
-          onChange={handleNoteChange}
-        />
-      </div>
-      <div className="editorActions">
-        {isDirty && saveStatus !== 'saving' && <span className="editorStatus">Unsaved changes.</span>}
-        {saveStatus === 'saving' && <span className="editorStatus">Saving...</span>}
-        {saveStatus === 'saved' && <span className="editorStatus editorStatusSuccess">Saved.</span>}
-        {errors.save && <span className="editorStatus editorStatusError">{errors.save}</span>}
-      </div>
-    </section>
-  </div>
+                  <span className="editorSwitchSlider" aria-hidden="true" />
+                </label>
+                : <input
+                  className="editorInput"
+                  type="text"
+                  value={value == null ? '' : String(value)}
+                  onChange={event => updateValue(key, event.target.value)}
+                />
+              }
+            </div>
+          ))}
+        </div>
+      }
+    </div>
+    <div className="panelSection noteInputSection">
+      <h2 className="panelTitle">Note (.md)</h2>
+      <MarkdownEditor
+        className="noteMarkdownEditor"
+        value={note.main}
+        placeholder={`Write the markdown note for ${date}.`}
+        onChange={handleNoteChange}
+      />
+    </div>
+    {quotesEnabled && <QuoteInput date={date} />}
+    <div className="editorActions">
+      {isDirty && saveStatus !== 'saving' && <span className="editorStatus">Unsaved changes.</span>}
+      {saveStatus === 'saving' && <span className="editorStatus">Saving...</span>}
+      {saveStatus === 'saved' && <span className="editorStatus editorStatusSuccess">Saved.</span>}
+      {errors.save && <span className="editorStatus editorStatusError">{errors.save}</span>}
+    </div>
+  </section>
 }

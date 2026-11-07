@@ -43,6 +43,22 @@
   justify-content: flex-end;
 }
 
+/* Only with a mouse: touch screens swipe between notes instead */
+.noteNav {
+  display: none;
+  gap: 10px;
+}
+
+@media (any-pointer: fine) {
+  .noteNav {
+    display: flex;
+  }
+}
+
+.noteNavOlder {
+  margin-left: auto;
+}
+
 /* Reaches out to the card edges, so pages slide in from the border, while the padding keeps the text aligned */
 .noteSwiper {
   overflow: hidden;
@@ -197,6 +213,106 @@
 
 .noteMarkdownEditor {
   min-height: 0;
+}
+
+.quoteField {
+  position: relative;
+}
+
+.quoteField .markdownEditor {
+  padding-right: 48px;
+}
+
+.quoteField .mdQuoteLine {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+}
+
+.quoteField .mdQuoteNoteLine {
+  color: var(--muted);
+}
+
+.quoteRemove {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  margin-top: -4px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 50%;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.quoteRemove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.quoteList {
+  display: grid;
+  gap: 10px;
+}
+
+.noteQuotes {
+  margin-top: 16px;
+}
+
+.quoteItem {
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent-border);
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--panel);
+  display: grid;
+  gap: 6px;
+}
+
+.quoteItem p,
+.quoteConfirmText {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.quoteText {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+:is(.quoteTextHidden, .quoteTextDenied) {
+  color: var(--muted);
+}
+
+.quoteTextDenied {
+  text-decoration: line-through;
+}
+
+.quoteNote {
+  color: var(--muted);
+}
+
+.quoteMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.quoteMeta a {
+  color: color-mix(in srgb, var(--accent) 82%, white);
+}
+
+.quoteActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quoteEditField {
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  resize: vertical;
 }
 
 .calendarHeader {
